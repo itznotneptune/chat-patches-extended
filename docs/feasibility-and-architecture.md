@@ -911,6 +911,7 @@ S1 covers only the Chat Patches-compatibility part of the reference swap (V-20m,
 ### 13.6 Retention, cleanup, isolation
 - **Retained:** `spikes/phase0/evidence/` (logs, screenshots, mixin exports, diffs) and `RESULTS.md`, plus an executed-test entry per spike test in verification.md §1 (X-02 onward) with date, environment and outcome.
 - **Cleanup:** after results are recorded, tag the spike branch (`spike/phase0-results`) and **remove** `spikes/phase0/` from the main line. Run directories (`run/`, worlds, generated chat logs) are deleted.
+- **Status (2026-10-18):** done. The spike, its evidence and `RESULTS.md` are preserved at tag `spike/phase0-results` (branch `spike/phase0`); `spikes/phase0/` is removed from `main`, and the run directories are deleted.
 - **Isolation:** the production project (Phase 1) starts fresh under its own Gradle project and mod ID `cpextended`. Spike code may be read as reference but is **never** copied or merged, especially the instrumentation mixin, debug commands and test mods.
 
 ### 13.7 Conditions that return to the owner (architectural decisions)

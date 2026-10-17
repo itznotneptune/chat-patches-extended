@@ -4,7 +4,7 @@ Companion to [feasibility-and-architecture.md](feasibility-and-architecture.md) 
 
 ## 0. Evidence status
 
-**Spike grouping (S1 and S2 executed 2026-10-18; results in §1 and `spikes/phase0/RESULTS.md`):**
+**Spike grouping (S1 and S2 executed 2026-10-18; results in §1 and `spikes/phase0/RESULTS.md` at tag `spike/phase0-results`):**
 - **S1, capture and Chat Patches integration:** V-01, V-02, V-05, V-06, V-15, V-35, V-47, V-03, V-27f, V-04c, V-20m, V-59, V-36 (fault-injection part).
 - **S2, UI layering and input:** V-53, V-55, V-39, V-07, V-57, V-58, V-54.
 
@@ -39,7 +39,7 @@ A failure in either goes back to the owner per the relevant P-item; no substitut
 
 X-01 supports R2–R4. It doesn't test RE2/J, and no RE2/J test has been run.
 
-X-02 to X-14 ran in the throwaway Phase 0 spike (architecture §13), not in production code. Details, findings (F-1 to F-5), the test-harness fixes made between passes, and the evidence index are in [`spikes/phase0/RESULTS.md`](../spikes/phase0/RESULTS.md).
+X-02 to X-14 ran in the throwaway Phase 0 spike (architecture §13), not in production code. Details, findings (F-1 to F-5), the test-harness fixes made between passes, and the evidence index are in `spikes/phase0/RESULTS.md` at tag `spike/phase0-results` (the spike was removed from `main` per architecture §13.6; view with `git show spike/phase0-results:spikes/phase0/RESULTS.md`).
 
 ## 2. Test environment (baseline, D11 / Q5)
 

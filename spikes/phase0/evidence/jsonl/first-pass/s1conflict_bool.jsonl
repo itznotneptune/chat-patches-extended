@@ -1,3 +1,0 @@
-{"t":"mode","mode":"s1conflict_bool","time":"2026-10-17T23:02:02.035805Z"}
-{"t":"chatscreen_searchbar_fields","fields":["showSearchBar:boolean=false","fd7f8b2f$chatpatches$showSearchBar$0:boolean=true"]}
-{"t":"result","test":"V-59.4.s1conflict_bool","pass":true,"reflectionStatus":"failed: java.lang.IllegalStateException: ambiguous field 'showSearchBar': exactCount=1 renamedChatPatchesVariant=true","searchBarShownRead":"null","searchIntegrationOff":true,"note":"Chat Patches default showSearchBar=true; a 'false' read with status ok means the wrong field was bound"}

@@ -1,0 +1,1 @@
+{"t": "result", "mode": "live-loader020", "test": "V-64.newerLoader", "outcome": "PASS", "loader": "0.20.0", "liveModeChecksPassed": 18, "liveModeChecksNotPassed": 0, "loaderWarningsAboutCpextended": [], "note": "the live mode re-run on Fabric Loader 0.20.0 (dev runtime only; metadata keeps >=0.19.5); no newer Fabric API exists for 1.21.11"}

@@ -1,0 +1,3 @@
+{"t":"mode","mode":"hide_relaunch2","time":"2026-10-18T18:04:03.043260Z","diagnosticsEnabled":true,"devDisabled":false}
+{"t":"result","mode":"hide_relaunch2","test":"V-04c.case4","outcome":"PASS","found":true,"recognized":true,"hidden":true,"display":"[10:00:00] counted cpx#R-cnt cpx#HD (x3)","note":"a restored message with a saved x3 counter in a hiding tab: hidden; the counter alone never signals condensation (P3)"}
+{"t":"result","mode":"hide_relaunch2","test":"Q16b.restoredUnderHiding","outcome":"PASS","ambiguousRestored":8,"ambiguousHidden":0,"recognizedRestoredHidden":41,"note":"restored history in a hiding tab with restoreHistory: recognized messages are hidden (§4.6), unrecognized (AMBIGUOUS) ones never (Q16b)"}

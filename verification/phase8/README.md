@@ -10,10 +10,13 @@ Date: 2026-10-19. Build: **`cpextended-1.0.0-rc.1`** (branch `phase8`). One clea
 
 **Environment:** macOS 26.5.1 (aarch64); Gradle 9.7.1 on JDK 25.0.4; game on Temurin JDK 21.0.8 (854×480). Minecraft 1.21.11, Fabric Loader 0.19.5 (plus one run on 0.20.0), Fabric API 0.141.6+1.21.11, Chat Patches 8.0.0, YACL 3.8.2. Synthetic chat only; no other players.
 
-## Outcome: 221 PASS, 0 FAIL, 1 INCONCLUSIVE, plus the NOT RUN items listed below
+## Outcome: 222 PASS, 0 FAIL, 0 INCONCLUSIVE, plus the NOT RUN items listed below
 - All 205 Phase 1–7 checks pass, including all Q36 safety tests, both structural baselines (hiding off and hiding on), V-59 (three conflict variants) and V-35.
 - 16 new Phase 8 checks.
-- The INCONCLUSIVE is the Reply/Delete button click path of Chat Patches' context menu (`V-18.contextMenu.replyDelete`, below).
+- **The context-menu evidence comes from a targeted re-run.** The full run's `V-18.contextMenu.replyDelete` was INCONCLUSIVE.
+  - The cause was found: menu rows reaching the bottom edge of the 854×480 window don't respond to clicks, with or without Extended.
+  - The test was corrected, and only the `ctxmenu` mode, plus a new control mode `ctxmenu_off` with Extended inactive, was re-run on the same release-candidate code. The product jar is unchanged (same checksum).
+  - `ctxmenu.jsonl`, `ctxmenu_off.jsonl` and their logs replace that mode's evidence.
 - Each assertion is counted once: the Loader 0.20.0 re-run of the `live` mode is summarized as a single result, `V-64.newerLoader`.
 
 ## Release candidate
@@ -41,7 +44,7 @@ Date: 2026-10-19. Build: **`cpextended-1.0.0-rc.1`** (branch `phase8`). One clea
 | Q36.rescaleRetry | PASS | Commit with line rebuilding failing at the commit and all 3 scheduled retries: committed, lines dirty, one toast. Two later rescales (chat width changes) still fail; messages, references and the config file are unchanged by the failed retries. A further rescale (window resize) with rebuilding working recovers: same references and order, no duplicates, the configuration change not repeated, lines equal to a reference rebuild, restored lines visible. |
 | compat.none / chat_heads / nochatreports / modmenu / all three | PASS (5) | Each combination: player chat captured and routed; hiding; Q3 replacement visible; P7 cap (20); orphan restoration of 20 messages; Chat Patches search on the swapped list finds them (V-20n: a cached old list is a different object, no crash); input box protected and window strip free; config GUI opens; with Mod Menu, its factory opens the same screen; world switch keeps tabs and the boundary line exempt; vanilla clearing clears tabs and hidden. **The log scan found 0 exception or error lines from any of these mods in every run.** |
 | V-18.contextMenu.copyActions | PASS | 11 actions with real clicks on a visible message whose neighbours are hidden messages: Copy Text (Raw, Formatted, Timestamp-less, JSON), Copy Time (Text, Hover Text, Formatted, Unix), Copy Link, Copy Sender (Username, UUID). Each copied exactly the clicked message's data. |
-| V-18.contextMenu.replyDelete | **INCONCLUSIVE** | The Reply and Delete buttons had **no effect in this harness**, neither on a real click nor on a direct press; cause not determined. Verified instead from the open menu's own state: the selected line is the clicked message, and the sender is the player. Chat Patches' own `deleteMessage` applied to that selection removed exactly that message, and Extended's tabs followed (liveness). The click path itself is unverified. |
+| V-18.contextMenu.replyDelete | PASS (re-run) | Real clicks with Extended active, on messages with hidden neighbours. **Reply** puts `/msg Player0 ` in the input box. **Delete**, with and without the animation, removes exactly the clicked message; Extended's tabs follow (liveness). The first run had the targets on the newest lines, so the menu's last rows reached the bottom of the window, where clicks don't respond. **Control `ctxmenu_off`** (Extended inactive): a bottom-row Reply and a bottom-row Delete do nothing there either, while a Delete higher up works. Window-size and Chat Patches behavior, not caused by Extended. |
 | V-45.chatVisibility | PASS | Full, Commands only and Hidden: every message that reached `addMessage` (system and player) got the same hide decision. |
 | V-04c.case3 | PASS | A test-only mixin adds a foreign entry inside the same call while Chat Patches condenses a duplicate; the identity snapshot detects it and the replacement stays visible. |
 | V-04c.case4 | PASS | A restored message carrying a saved `x3` counter in a hiding tab is recognized and hidden. The counter never signals condensation. |
@@ -97,7 +100,7 @@ A vanilla 1.21.11 **dedicated server** started in-process by Fabric's client gam
   - **Rescale:** at 854×480, GUI scales 2 and 3 both clamp to 2, so chat width and window size changes are used instead.
   - **Language:** the German string is read from the game instead of assumed.
   - **Controls category:** found by its key binding.
-  - **Context menu:** the first version reported PASS from stale clipboard data; it was rewritten with a clipboard sentinel, hovering before clicking, and strict per-action expectations.
+  - **Context menu:** the first version reported PASS from stale clipboard data; it was rewritten with a clipboard sentinel, hovering before clicking, and strict per-action expectations. The full run's Reply/Delete INCONCLUSIVE was traced to bottom-of-window menu rows (control run without Extended), and the targets were moved up the screen.
   - **Compat orphan step:** the catch-all tab still held the hidden messages.
   - **Multiplayer:** port conflict (above); the deliberate kick's connection-close assertion is now caught.
 
@@ -106,7 +109,7 @@ A vanilla 1.21.11 **dedicated server** started in-process by Fabric's client gam
 - **Chat Patches 8.0.0's log** stops saving once full with an unchanged count (Phase 6).
 
 ## Remaining limitations and untested scenarios
-- **Reply/Delete click path:** INCONCLUSIVE (above).
+- **Chat Patches' context menu:** rows reaching the bottom edge of a small window (854×480 here) don't respond to clicks, with or without Extended (observation).
 - **Mod coverage:** the NOT RUN combinations and areas above.
 - **Not tested:**
   - power loss, and file systems without atomic rename (only simulated);

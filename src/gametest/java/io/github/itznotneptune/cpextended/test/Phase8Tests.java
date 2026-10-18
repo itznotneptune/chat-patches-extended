@@ -257,8 +257,15 @@ final class Phase8Tests {
 				send(sp, "neighbour hidden " + i + " cpx#HD-n" + i);
 				send(sp, "target visible " + i + " cpx#OT-t" + i + " https://example.invalid/t" + i);
 			}
+			send(sp, "neighbour hidden x cpx#HD-nx");
+			send(sp, "plain target cpx#OT-tx");
+			send(sp, "neighbour hidden y cpx#HD-ny");
+			send(sp, "plain target two cpx#OT-ty");
 			ctx.runOnClient(c -> c.player.connection.sendChat("player line cpx#OT-tp"));
 			t.waitT(8);
+			// later lines push the targets up the screen, so the context menu (it opens downward from the clicked line)
+			// stays clear of the bottom rows that don't respond in this window size, with or without Extended
+			for (int i = 0; i < 8; i++) send(sp, "filler after targets " + i + " cpx#OT-z" + i);
 			String name = onClient(() -> Minecraft.getInstance().getUser().getName());
 			String uuid = onClient(() -> Minecraft.getInstance().getUser().getProfileId().toString());
 			Map<String, Object> actions = new LinkedHashMap<>();
@@ -303,19 +310,111 @@ final class Phase8Tests {
 			m.put("actions", actions);
 			m.put("summary", row("pass", pass, "fail", fail));
 			ev.result("V-18.contextMenu.copyActions", fail == 0 && pass == 11, "observed", m, "note", "real right-click on a visible message whose neighbours are hidden messages; sub-actions clicked after hovering their group; clipboard reset to a sentinel before each action; FAIL if the copied text concerns another message or nothing was copied");
-			// Reply and Delete: the menu's own selection is checked, and Chat Patches' delete is applied to that selection
-			Map<String, Object> state = menuStateFor("cpx#OT-t3", "cpx#OT-tp");
+			// Reply and Delete. Chat Patches' bottom menu row overlaps its own search field, which takes the click first:
+			// (a) Delete on a link-less message (one row fewer, so Delete isn't in the bottom row), Extended active;
+			// (b) the search bar hidden: Reply and Delete in the bottom row.
+			ctx.runOnClient(c -> ChatPatches.config.contextDeletionSizzle = false);
+			Map<String, Object> plainDelete = pressAction("cpx#OT-tx", "Delete", null, 4);
+			plainDelete.remove("clipboardFull");
+			boolean plainDeleteOk = List.of("cpx#OT-tx").equals(plainDelete.get("removedFromMainChat")) && Boolean.TRUE.equals(plainDelete.get("tabsFollowLiveness"));
+			rd.put("a.deleteLinklessMessage", plainDelete);
+			setShowSearchBar(false);
+			Map<String, Object> replyNoBar = pressAction("cpx#OT-tp", "Reply", null, 4);
+			replyNoBar.remove("clipboardFull");
+			Map<String, Object> deleteNoBar = pressAction("cpx#OT-t3", "Delete", null, 4);
+			deleteNoBar.remove("clipboardFull");
+			setShowSearchBar(true);
+			boolean replyNoBarOk = replyNoBar.get("inputBox") instanceof String in && in.contains(name);
+			boolean deleteNoBarOk = List.of("cpx#OT-t3").equals(deleteNoBar.get("removedFromMainChat")) && Boolean.TRUE.equals(deleteNoBar.get("tabsFollowLiveness"));
+			rd.put("b.searchBarHidden.reply", replyNoBar);
+			rd.put("b.searchBarHidden.deleteLinkedMessage", deleteNoBar);
+			Map<String, Object> state = menuStateFor("cpx#OT-ty", "cpx#OT-tp");
 			rd.put("menuSelectionAndCpDelete", state);
-			boolean anyClick = rd.values().stream().anyMatch(v -> v instanceof Map<?, ?> mm && "PASS".equals(mm.get("verdict")));
-			boolean stateOk = Boolean.TRUE.equals(state.get("systemMenuSelectedClickedLine")) && Boolean.TRUE.equals(state.get("playerMenuSenderIsPlayer"))
-					&& Boolean.TRUE.equals(state.get("cpDeleteRemovedExactlyIt")) && Boolean.TRUE.equals(state.get("tabsFollowLiveness"));
-			ev.result("V-18.contextMenu.replyDelete", anyClick && stateOk ? Evidence.Outcome.PASS : Evidence.Outcome.INCONCLUSIVE, "observed", rd,
-					"note", "the Reply and Delete buttons had no effect in this harness, neither on a real click nor on a direct press (cause not determined); the open menu's selected line and sender are the clicked message, and Chat Patches' own delete applied to that selection removes exactly it with Extended's tabs following. The click path itself stays unverified.");
+			boolean ok = plainDeleteOk && replyNoBarOk && deleteNoBarOk;
+			ev.result("V-18.contextMenu.replyDelete", ok ? Evidence.Outcome.PASS : plainDeleteOk ? Evidence.Outcome.INCONCLUSIVE : Evidence.Outcome.FAIL, "observed", rd, "verdicts", row("deleteLinkless", plainDeleteOk, "replySearchBarHidden", replyNoBarOk, "deleteLinkedSearchBarHidden", deleteNoBarOk),
+					"note", "real clicks with Extended active; targets moved up the screen by later lines. Menu rows reaching the bottom of the 854x480 window don't respond to clicks with or without Extended (control: ctxmenu_off).");
 		}
 		t.waitT(20);
 	}
 
 	static final String SENTINEL = "cpx-sentinel";
+
+	void setShowSearchBar(boolean v) {
+		ctx.runOnClient(c -> {
+			try {
+				var f = ChatScreen.class.getDeclaredField("showSearchBar");
+				f.setAccessible(true);
+				f.setBoolean(null, v);
+			} catch (ReflectiveOperationException e) {
+				throw new IllegalStateException(e);
+			}
+		});
+	}
+
+	/**
+	 * Control run with Extended inactive (dev kill switch: no mixins, no entrypoint work): do Chat Patches' Reply and
+	 * Delete buttons act in this harness at all? Uses only vanilla and Chat Patches.
+	 */
+	void ctxmenuOff() throws Exception {
+		Map<String, Object> m = new LinkedHashMap<>();
+		m.put("extendedInactive", io.github.itznotneptune.cpextended.dev.DevHooks.disabled());
+		try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
+			t.waitT(40);
+			ctx.runOnClient(c -> { ChatPatches.config.contextDeletionWarning = false; ChatPatches.config.contextDeletionSizzle = false; ChatPatches.config.contextMenu = true;
+				c.gui.getChat().clearMessages(false); });
+			for (int i = 0; i < 3; i++) t.sys(sp, "control visible " + i + " cpx#OT-c" + i);
+			t.sys(sp, "control linked cpx#OT-cl https://example.invalid/c");
+			ctx.runOnClient(c -> c.player.connection.sendChat("control player cpx#OT-cp"));
+			t.waitT(8);
+			String name = onClient(() -> Minecraft.getInstance().getUser().getName());
+			Map<String, Object> reply = pressActionRaw("cpx#OT-cp", "Reply");
+			Map<String, Object> del = pressActionRaw("cpx#OT-c1", "Delete");
+			Map<String, Object> delLinked = pressActionRaw("cpx#OT-cl", "Delete");
+			m.put("reply", reply);
+			m.put("delete", del);
+			m.put("deleteLinkedBottomRow", delLinked);
+			m.put("deleteLinkedActsWithoutExtended", List.of("cpx#OT-cl").equals(delLinked.get("removedFromMainChat")));
+			boolean replyWorks = reply.get("inputBox") instanceof String in && in.contains(name);
+			boolean deleteWorks = List.of("cpx#OT-c1").equals(del.get("removedFromMainChat"));
+			m.put("replyActsWithoutExtended", replyWorks);
+			m.put("deleteActsWithoutExtended", deleteWorks);
+			// a control measurement, recorded as data (not a pass/fail of Extended, so not counted as a result)
+			ev.data("contextMenu_control_without_extended", "observed", m,
+					"note", "Chat Patches' Reply/Delete with Extended inactive: bottom-of-screen menu rows don't respond in this window size here too");
+		}
+		t.waitT(20);
+	}
+
+	/** Like pressAction, without any Extended state (works with Extended inactive). */
+	Map<String, Object> pressActionRaw(String tok, String label) {
+		List<String> before = mainTokens();
+		ctx.setScreen(() -> new ChatScreen("", false));
+		t.waitT(3);
+		double[] at = lineOf(tok);
+		if (at == null) { ctx.setScreen(() -> null); return row("error", "line not found"); }
+		p3.click(at[0], at[1], 1);
+		t.waitT(3);
+		AbstractWidget w = widget(label);
+		if (w == null) { ctx.setScreen(() -> null); return row("error", "button not found"); }
+		p3.cursor(w.getX() + w.getWidth() / 2.0, w.getY() + w.getHeight() / 2.0);
+		t.waitT(2);
+		p3.click(w.getX() + w.getWidth() / 2.0, w.getY() + w.getHeight() / 2.0, 0);
+		t.waitT(6);
+		String input = onClient(() -> {
+			if (!(Minecraft.getInstance().screen instanceof ChatScreen cs)) return null;
+			try {
+				var fld = ChatScreen.class.getDeclaredField("input");
+				fld.setAccessible(true);
+				return ((net.minecraft.client.gui.components.EditBox) fld.get(cs)).getValue();
+			} catch (ReflectiveOperationException e) {
+				return "unreadable";
+			}
+		});
+		ctx.setScreen(() -> null);
+		t.waitT(3);
+		List<String> after = mainTokens();
+		return row("inputBox", input, "removedFromMainChat", before.stream().filter(x -> !after.contains(x)).toList(), "button", row("x", w.getX(), "y", w.getY()));
+	}
 
 	/** Opens the menu on each message and reads its own selection (reflection on Chat Patches' menu), then deletes via Chat Patches. */
 	Map<String, Object> menuStateFor(String systemTok, String playerTok) {

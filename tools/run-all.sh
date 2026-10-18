@@ -75,6 +75,7 @@ tools/run-mode.sh hide_relaunch_nolog
 
 echo "== phase 8: release hardening and compatibility"
 for m in rescale ctxmenu misc8 keys8 mp; do tools/run-mode.sh $m; done
+tools/run-mode.sh ctxmenu_off "cpextended.dev.disable=true"   # control: Chat Patches' context menu with Extended inactive (data only)
 tools/run-compat.sh "$out"
 # V-64 on a newer Fabric Loader (runtime only; the built metadata keeps loader_version). Summarized as one result so
 # the live mode's own checks aren't counted twice.

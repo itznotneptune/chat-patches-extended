@@ -114,6 +114,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 				case "rescale" -> new Phase8Tests(this).rescale();
 				case "compat" -> new Phase8Tests(this).compat();
 				case "ctxmenu" -> new Phase8Tests(this).ctxmenu();
+				case "ctxmenu_off" -> new Phase8Tests(this).ctxmenuOff();
 				case "misc8" -> new Phase8Tests(this).misc8();
 				case "keys8" -> new Phase8Tests(this).keys8();
 				case "mp" -> new Phase8Tests(this).mp();

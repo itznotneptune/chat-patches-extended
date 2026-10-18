@@ -28,6 +28,8 @@ if meta_path.exists():
 v35 = d / "v35-summary.txt"
 if v35.exists():
     for line in v35.read_text().splitlines():
+        if line.startswith("v35-stub800build"):
+            continue
         if line.startswith("v35-"):
             name, rest = line.split(":", 1)
             refused = "refused=1" in rest and "cpextendedOutput=0" in rest

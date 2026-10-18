@@ -782,6 +782,14 @@ final class Phase7bTests {
 				});
 				long edgeHidden = edge.stream().filter(MessageRecord::hidden).count();
 				long recognizedHidden = recs.stream().filter(r -> r.origin() == Origin.RESTORED && !r.ambiguous() && r.hidden()).count();
+				MessageRecord cnt = onClient(() -> {
+					for (MessageRecord r : SessionMirror.get().hiddenRecords()) if (r.original() != null && r.original().getString().contains("cpx#R-cnt")) return r;
+					for (MessageRecord r : SessionMirror.get().records()) if (r.original() != null && r.original().getString().contains("cpx#R-cnt")) return r;
+					return null;
+				});
+				ev.result("V-04c.case4", cnt != null && !cnt.ambiguous() && cnt.hidden() && cnt.message().content().getString().contains("x3"),
+						"found", cnt != null, "recognized", cnt != null && !cnt.ambiguous(), "hidden", cnt != null && cnt.hidden(), "display", cnt == null ? null : cnt.message().content().getString(),
+						"note", "a restored message with a saved x3 counter in a hiding tab: hidden; the counter alone never signals condensation (P3)");
 				ev.result("Q16b.restoredUnderHiding", !edge.isEmpty() && edgeHidden == 0 && recognizedHidden > 0, "ambiguousRestored", edge.size(), "ambiguousHidden", edgeHidden,
 						"recognizedRestoredHidden", recognizedHidden, "note", "restored history in a hiding tab with restoreHistory: recognized messages are hidden (§4.6), unrecognized (AMBIGUOUS) ones never (Q16b)");
 			}

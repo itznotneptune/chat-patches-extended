@@ -11,6 +11,10 @@ VARIANTS = {
     "stub720": {"version": "7.2.0", "minecraft": "=1.21.11"},
     # An 8.0.0 build for a different Minecraft version: satisfies the pin by version string, rejected by its own dependency.
     "stub800mc": {"version": "8.0.0", "minecraft": "=1.21.10"},
+    # Phase 8 edges: a pre-release of 8.0.0 (lower than 8.0.0 in SemVer) must be refused; build metadata is ignored by
+    # SemVer, so 8.0.0+<build> satisfies the pin: that one starts the game without any Chat Patches classes (V-36 stub).
+    "stub800pre": {"version": "8.0.0-beta.1", "minecraft": "=1.21.11"},
+    "stub800build": {"version": "8.0.0+stub.1", "minecraft": "=1.21.11"},
 }
 
 OUT.mkdir(parents=True, exist_ok=True)

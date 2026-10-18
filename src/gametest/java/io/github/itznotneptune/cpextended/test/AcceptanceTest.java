@@ -78,6 +78,10 @@ public final class AcceptanceTest implements FabricClientGameTest {
 		ev.data("mode", "mode", mode, "time", Instant.now().toString(), "diagnosticsEnabled", Diagnostics.ENABLED,
 				"devDisabled", DevHooks.disabled());
 		try {
+			if (mode.equals("stub36")) { // Chat Patches is a classless stub here: nothing may touch its classes
+				new StubTests(this).stub36();
+				return;
+			}
 			ctx.runOnClient(c -> resetChatPatchesConfig());
 			switch (mode) {
 				case "live" -> live();
@@ -107,6 +111,12 @@ public final class AcceptanceTest implements FabricClientGameTest {
 				case "q36_kill_after" -> new Phase7aTests(this).q36Kill("afterReplace");
 				case "q36_kill_check" -> new Phase7aTests(this).q36KillCheck();
 				case "hide" -> new Phase7bTests(this).hideMode();
+				case "rescale" -> new Phase8Tests(this).rescale();
+				case "compat" -> new Phase8Tests(this).compat();
+				case "ctxmenu" -> new Phase8Tests(this).ctxmenu();
+				case "misc8" -> new Phase8Tests(this).misc8();
+				case "keys8" -> new Phase8Tests(this).keys8();
+				case "mp" -> new Phase8Tests(this).mp();
 				case "hideperf" -> new Phase5Tests(this).searchperf(true);
 				case "hide_seed" -> new Phase7bTests(this).hideSeed(true);
 				case "hide_relaunch" -> new Phase7bTests(this).hideRelaunch(true);

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Acceptance run (Milestones 1a, 1b, Phases 2-7) from a clean run directory, then evidence collection.
-# Usage: tools/run-all.sh [output-dir]   (default verification/phase7; earlier evidence directories are left as recorded)
+# Acceptance run (Milestones 1a, 1b, Phases 2-8) from a clean run directory, then evidence collection.
+# Usage: tools/run-all.sh [output-dir]   (default verification/phase8; earlier evidence directories are left as recorded)
 set -u
 root="$(cd "$(dirname "$0")/.." && pwd)"; cd "$root"
-run="build/run/clientGameTest"; logs="build/m1a-logs"; out="${1:-verification/phase7}"
+run="build/run/clientGameTest"; logs="build/m1a-logs"; out="${1:-verification/phase8}"
 export JAVA_HOME="$(/usr/libexec/java_home -v 25)"
 rm -rf build/run build/libs "$logs" "$out"; mkdir -p "$run" "$logs" "$out/evidence" "$out/logs"
 
@@ -73,14 +73,38 @@ tools/run-mode.sh hide_relaunch2
 tools/run-mode.sh hide_seed_nolog
 tools/run-mode.sh hide_relaunch_nolog
 
+echo "== phase 8: release hardening and compatibility"
+for m in rescale ctxmenu misc8 keys8 mp; do tools/run-mode.sh $m; done
+tools/run-compat.sh "$out"
+# V-64 on a newer Fabric Loader (runtime only; the built metadata keeps loader_version). Summarized as one result so
+# the live mode's own checks aren't counted twice.
+cp "$run/cpx-evidence/live.jsonl" "$run/live.jsonl.main"; cp "$logs/live.log" "$logs/live.log.main"
+rm -f "$run/logs/chatlog.json"
+tools/run-mode.sh live "cpextended.debug=true" -PruntimeLoader=0.20.0
+cp "$logs/live.log" "$logs/live-loader020.log"
+mv "$run/live.jsonl.main" "$run/cpx-evidence/live.jsonl"; mv "$logs/live.log.main" "$logs/live.log"
+python3 -I - "$logs/live-loader020.log" > "$out/evidence/v64-newer-loader.jsonl" <<'PY'
+import json, re, sys
+log = open(sys.argv[1], errors="replace").read()
+loader = re.search(r"with Fabric Loader (\S+)", log)
+passes = len(re.findall(r'\[CPX-M1A\].*"outcome":"PASS"', log))
+fails = len(re.findall(r'\[CPX-M1A\].*"outcome":"(FAIL|INCONCLUSIVE)"', log))
+warn = [l for l in log.splitlines() if "FabricLoader" in l and "WARN" in l and "cpextended" in l]
+ok = loader is not None and loader.group(1) == "0.20.0" and passes > 0 and fails == 0 and not warn
+print(json.dumps({"t": "result", "mode": "live-loader020", "test": "V-64.newerLoader", "outcome": "PASS" if ok else "FAIL",
+                  "loader": loader.group(1) if loader else None, "liveModeChecksPassed": passes, "liveModeChecksNotPassed": fails, "loaderWarningsAboutCpextended": warn,
+                  "note": "the live mode re-run on Fabric Loader 0.20.0 (dev runtime only; metadata keeps >=0.19.5); no newer Fabric API exists for 1.21.11"}))
+PY
+
 echo "== V-35"; tools/run-v35.sh | tee "$out/evidence/v35-summary.txt"
 
 echo "== collect"
+rm -f "$run/cpx-evidence/compat.jsonl"  # kept per combination by run-compat.sh
 cp "$run"/cpx-evidence/restore_seed-live.json "$run"/cpx-evidence/hide-seed.json "$out/evidence/" 2>/dev/null
 rm -f "$run/cpx-evidence/q36_kill_check.jsonl"  # kept per kill point above
 cp "$run"/cpx-evidence/*.jsonl "$run"/cpx-evidence/*-mainchat.txt "$run"/cpx-evidence/*-chatlog.json "$out/evidence/" 2>/dev/null
 cp "$logs/compileClasspath.txt" "$out/evidence/"
-mkdir -p "$out/evidence/screenshots" && cp "$run"/screenshots/*p2-hud-*.png "$run"/screenshots/*p3-*.png "$run"/screenshots/*p4-*.png "$run"/screenshots/*p5-*.png "$run"/screenshots/*p6-*.png "$out/evidence/screenshots/" 2>/dev/null
+mkdir -p "$out/evidence/screenshots" && cp "$run"/screenshots/*p2-hud-*.png "$run"/screenshots/*p3-*.png "$run"/screenshots/*p4-*.png "$run"/screenshots/*p5-*.png "$run"/screenshots/*p6-*.png "$run"/screenshots/*p8-*.png "$out/evidence/screenshots/" 2>/dev/null
 jar=$(ls build/libs/cpextended-*.jar | grep -v sources | head -1)
 unzip -p "$jar" fabric.mod.json > "$out/evidence/release-fabric.mod.json"
 unzip -l "$jar" | awk 'NR>3 {print $4}' | grep -v '^$' > "$out/evidence/release-jar-contents.txt"

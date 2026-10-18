@@ -26,6 +26,8 @@ EDGE = [
     {"text": "root text cpx#R-old5 ", "extra": [STAMP, "middle", ""]},
     # four siblings
     {"text": "", "extra": [STAMP, "four siblings cpx#R-old7", "", " tail"]},
+    # V-04c (4): a recognized restored message carrying a saved duplicate counter (the counter never signals condensation)
+    {"text": "", "extra": [STAMP, "counted cpx#R-cnt cpx#HD", {"text": " (x3)", "color": "yellow"}]},
     # translatable root (not empty plain text)
     {"translate": "chat.type.announcement", "with": ["Server", "translatable root cpx#R-old8 "], "extra": [STAMP, "x", ""]},
 ]

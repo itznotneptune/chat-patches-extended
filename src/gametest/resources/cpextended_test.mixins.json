@@ -12,7 +12,8 @@
     "ChatScreenCounterMixin",
     "ConflictBooleanMixin",
     "ConflictIntMixin",
-    "ConflictErrorMixin"
+    "ConflictErrorMixin",
+    "CondenseInjectMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }

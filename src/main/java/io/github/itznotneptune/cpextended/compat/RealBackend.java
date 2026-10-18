@@ -38,4 +38,9 @@ final class RealBackend implements ChatPatchesBackend {
 	@Override public boolean searchRegex() { return ChatPatches.config.regex; }
 	@Override public boolean searchEmptyShowsFullChat() { return ChatPatches.config.searchEmptyShowsFullChat; }
 	@Override public java.util.List<net.minecraft.client.GuiMessage> searchResults(ChatScreen screen) { return ((ChatScreenAccess) screen).getSearchResults(); }
+
+	@Override
+	public Object searchError(java.lang.reflect.Field handle, ChatScreen screen) throws ReflectiveOperationException {
+		return handle.get(screen);
+	}
 }

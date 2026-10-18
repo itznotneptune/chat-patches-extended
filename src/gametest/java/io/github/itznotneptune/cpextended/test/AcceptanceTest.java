@@ -99,7 +99,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 				case "search" -> new Phase5Tests(this).search();
 				case "searchperf" -> new Phase5Tests(this).searchperf();
 				case "extras" -> new ExtrasTests(this).extras();
-				case "conflict_bool", "conflict_int" -> conflict();
+				case "conflict_bool", "conflict_int", "conflict_error" -> conflict();
 				case "structural_off", "structural_base", "structural_tabs" -> structural();
 				default -> ev.data("error", "msg", "unknown mode " + mode);
 			}
@@ -940,6 +940,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 			@Override public boolean searchRegex() { return real.searchRegex(); }
 			@Override public boolean searchEmptyShowsFullChat() { return real.searchEmptyShowsFullChat(); }
 			@Override public java.util.List<net.minecraft.client.GuiMessage> searchResults(ChatScreen s) { return real.searchResults(s); }
+			@Override public Object searchError(java.lang.reflect.Field h, ChatScreen s) throws ReflectiveOperationException { return real.searchError(h, s); }
 		};
 	}
 
@@ -949,10 +950,11 @@ public final class AcceptanceTest implements FabricClientGameTest {
 		Map<String, Object> st = ctx.computeOnClient(c -> {
 			ChatPatchesAdapter a = ChatPatchesAdapter.get();
 			List<String> fields = new ArrayList<>();
-			for (Field f : ChatScreen.class.getDeclaredFields()) if (f.getName().contains("showSearchBar")) fields.add(f.getName() + ":" + f.getType().getName());
+			for (Field f : ChatScreen.class.getDeclaredFields())
+				if (f.getName().contains("showSearchBar") || f.getName().contains("searchError")) fields.add(f.getName() + ":" + f.getType().getName());
 			return row("degraded", a.isDegraded(), "searchIntegrationOff", a.isSearchIntegrationOff(), "failedOps", a.failedOps().toString(),
 					"toasts", Warnings.toastsShown(), "warnings", Warnings.counts().toString(), "searchBarShown", String.valueOf(a.isSearchBarShown()),
-					"showSearchBarFields", fields);
+					"conflictFields", fields);
 		});
 		boolean routed;
 		install(config(tab("tok", "cpx#")));
@@ -962,10 +964,26 @@ public final class AcceptanceTest implements FabricClientGameTest {
 			waitT(8);
 			Rec r = one("cpx#CF-1");
 			routed = r != null && r.tabs().contains("tok") && inMainChat(r.msg());
+			// with a query typed in regex mode (valid and invalid), tab search stays off and nothing fails further
+			ctx.runOnClient(c -> { ChatPatches.config.regex = true; c.setScreen(new ChatScreen("", false)); });
+			waitT(3);
+			for (String q : new String[]{".*conflict.*", "([bad"}) {
+				ctx.runOnClient(c -> {
+					var box = ChatPatchesAdapter.get().searchFieldWidget((ChatScreen) c.screen);
+					if (box != null) box.setValue(q);
+				});
+				waitT(3);
+				st.put("tabSearchActive:" + q, ctx.computeOnClient(c -> io.github.itznotneptune.cpextended.search.TabSearch.state().active()));
+			}
+			ctx.runOnClient(c -> { c.setScreen(null); ChatPatches.config.regex = false; });
+			st.put("toastsAfterQueries", ctx.computeOnClient(c -> Warnings.toastsShown()));
 		}
+		String expectOp = mode.equals("conflict_error") ? "SEARCH_ERROR" : "SEARCH_VISIBILITY";
 		boolean ok = Boolean.FALSE.equals(st.get("degraded")) && Boolean.TRUE.equals(st.get("searchIntegrationOff"))
-				&& String.valueOf(st.get("failedOps")).contains("SEARCH_VISIBILITY") && Integer.valueOf(1).equals(st.get("toasts"))
-				&& "null".equals(st.get("searchBarShown")) && routed;
+				&& String.valueOf(st.get("failedOps")).contains(expectOp) && Integer.valueOf(1).equals(st.get("toasts"))
+				&& (mode.equals("conflict_error") ? "true".equals(st.get("searchBarShown")) || "false".equals(st.get("searchBarShown")) : "null".equals(st.get("searchBarShown")))
+				&& Boolean.FALSE.equals(st.get("tabSearchActive:.*conflict.*")) && Boolean.FALSE.equals(st.get("tabSearchActive:([bad"))
+				&& Integer.valueOf(1).equals(st.get("toastsAfterQueries")) && routed;
 		ev.result("V-59.4." + mode, ok, "state", st, "routingUnaffected", routed);
 		waitT(20);
 	}

@@ -23,7 +23,7 @@ rm -f "$run/logs/chatlog.json"
 tools/run-mode.sh live "cpextended.debug=true,mixin.debug.export=true"
 cc=$(find "$run/.mixin.out" -path "*net/minecraft/client/gui/components/ChatComponent.class" | head -1)
 [ -n "$cc" ] && cp "$cc" "$out/evidence/ChatComponent.mixin-export.class"
-for m in restore clear faults conflict_bool conflict_int matcher drift; do tools/run-mode.sh $m; done
+for m in restore clear faults conflict_bool conflict_int conflict_error matcher drift; do tools/run-mode.sh $m; done
 
 echo "== phase 2: configuration and HUD windows"
 tools/run-mode.sh config

@@ -255,9 +255,14 @@ public final class ChatOpenRenderer {
 
 		// Search indicators (display only, never a message): "No matches" (P13) or "Partial results" (Q31).
 		if (view.indicator() != TabSearch.Indicator.NONE) {
-			Component note = Component.translatable(view.indicator() == TabSearch.Indicator.NO_MATCHES ? "cpextended.search.no_matches" : "cpextended.search.partial");
+			Component note = Component.translatable(switch (view.indicator()) {
+				case NO_MATCHES -> "cpextended.search.no_matches";
+				case INVALID -> "cpextended.search.invalid";
+				default -> "cpextended.search.partial";
+			});
 			int nx = body[0] + body[2] - SCROLLBAR_W - 2 - font.width(note);
-			g.drawString(font, note, Math.max(body[0] + 2, nx), body[1] + 2, 0xFF909090, true);
+			int color = view.indicator() == TabSearch.Indicator.INVALID ? 0xFFE07070 : 0xFF909090;
+			g.drawString(font, note, Math.max(body[0] + 2, nx), body[1] + 2, color, true);
 		}
 
 		// Scrollbar and resize grip.

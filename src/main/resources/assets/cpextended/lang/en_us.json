@@ -48,5 +48,6 @@
   "cpextended.gui.add_exclude": "+ Exclude",
   "cpextended.gui.save": "Save",
   "cpextended.search.no_matches": "No matches",
-  "cpextended.search.partial": "Partial results"
+  "cpextended.search.partial": "Partial results",
+  "cpextended.search.invalid": "Invalid search expression"
 }

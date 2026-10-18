@@ -30,7 +30,7 @@ public final class ChatPatchesAdapter {
 	public enum Op {
 		RESTORED_TAG(FailureClass.S), VANILLA_CLEARING(FailureClass.S), CHAT_MAX_MESSAGES(FailureClass.S), BOUNDARY(FailureClass.S),
 		CONDENSE_WINDOW(FailureClass.L), SAFE_POINT(FailureClass.L), CHAT_PATCHES_UI(FailureClass.L), MAIN_CHAT_LINE(FailureClass.L),
-		SEARCH_VISIBILITY(FailureClass.Q), SEARCH_QUERY(FailureClass.Q);
+		SEARCH_VISIBILITY(FailureClass.Q), SEARCH_QUERY(FailureClass.Q), SEARCH_ERROR(FailureClass.Q);
 
 		public final FailureClass failureClass;
 
@@ -50,6 +50,7 @@ public final class ChatPatchesAdapter {
 	private volatile boolean searchIntegrationOff;
 	private volatile Field showSearchBar;
 	private volatile Field searchField;
+	private volatile Field searchError;
 	private final Set<Op> failedOps = new LinkedHashSet<>();
 
 	private ChatPatchesAdapter() {}
@@ -284,6 +285,29 @@ public final class ChatPatchesAdapter {
 		}
 	}
 
+	/** Chat Patches' verdict on the current regex query (P12 amendment, Phase 5). */
+	public enum RegexState { VALID, INVALID, FAILED }
+
+	/**
+	 * Whether Chat Patches reports the current query as an invalid regex ({@code searchError} non-null). Only meaningful
+	 * in regex mode; Chat Patches clears the field for valid, empty and non-regex queries. An unreadable or
+	 * uninterpretable value is a Class Q failure (search integration off), never a guess.
+	 */
+	public RegexState regexState(ChatScreen screen) {
+		Field f = searchError;
+		if (searchIntegrationOff || f == null) return RegexState.FAILED;
+		try {
+			Object v = backend.searchError(f, screen);
+			if (v == null) return RegexState.VALID;
+			if (v instanceof IllegalArgumentException) return RegexState.INVALID;
+			failQ(Op.SEARCH_ERROR, "unexpected value " + v.getClass().getName(), null);
+			return RegexState.FAILED;
+		} catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+			failQ(Op.SEARCH_ERROR, "read error", e);
+			return RegexState.FAILED;
+		}
+	}
+
 	// ---------------------------------------------------------------- self-check
 
 	/** Exercises every operation once and validates it (architecture §8.2). Safe with no ChatScreen open. */
@@ -297,14 +321,18 @@ public final class ChatPatchesAdapter {
 
 		SearchFieldHandles.Resolution vis = SearchFieldHandles.resolveShowSearchBar();
 		SearchFieldHandles.Resolution query = SearchFieldHandles.resolveSearchField();
+		SearchFieldHandles.Resolution err = SearchFieldHandles.resolveSearchError();
 		showSearchBar = vis.field();
 		searchField = query.field();
+		searchError = err.field();
 		if (!vis.ok()) failQ(Op.SEARCH_VISIBILITY, "showSearchBar " + vis.error(), null);
 		if (!query.ok()) failQ(Op.SEARCH_QUERY, "searchField " + query.error(), null);
+		if (!err.ok()) failQ(Op.SEARCH_ERROR, "searchError " + err.error(), null);
 		if (vis.ok()) isSearchBarShown();
 		selfChecked = true;
 		Diagnostics.event("adapter_selfcheck", "degraded", degraded, "searchIntegrationOff", searchIntegrationOff,
-				"failedOps", failedOps.toString(), "showSearchBar", vis.ok() ? "ok" : vis.error(), "searchField", query.ok() ? "ok" : query.error());
+				"failedOps", failedOps.toString(), "showSearchBar", vis.ok() ? "ok" : vis.error(), "searchField", query.ok() ? "ok" : query.error(),
+				"searchError", err.ok() ? "ok" : err.error());
 	}
 
 	// ---------------------------------------------------------------- failure handling

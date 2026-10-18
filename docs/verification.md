@@ -15,7 +15,7 @@ A failure in either goes back to the owner per the relevant P-item; no substitut
 | Category | Meaning | Current contents |
 |---|---|---|
 | **Source-verified findings** | Established by reading source, bytecode or published metadata | S1–S23, V1–V9, R1/R5/R6 (architecture §2) |
-| **Executed tests** | Actually run, with recorded results | X-01 (scratch JDK regex experiment); X-02 to X-14 (Phase 0 spikes S1/S2, throwaway code); **X-15 to X-44 (Milestones 1a/1b, Phases 2–5), production code** (§1). Some criteria were run only in part; each entry says which. |
+| **Executed tests** | Actually run, with recorded results | X-01 (scratch JDK regex experiment); X-02 to X-14 (Phase 0 spikes S1/S2, throwaway code); **X-15 to X-45 (Milestones 1a/1b, Phases 2–5 and the Phase 5 correction), production code** (§1). Some criteria were run only in part; each entry says which. |
 | **Planned tests** | Defined, not yet run | Everything in §3, except the parts executed in X-02 to X-13. §3 rows keep `Status: Planned` until the production implementation is verified; spike results show feasibility only. |
 
 ## 1. Executed tests log
@@ -66,6 +66,7 @@ A failure in either goes back to the owner per the relevant P-item; no substitut
 | X-42 | 2026-10-18 | macOS 26.5.1, Gradle 9.7.1 on JDK 25.0.4, game on Temurin JDK 21.0.8; MC 1.21.11, Loader 0.19.5, Chat Patches 8.0.0; Fabric client gametest, singleplayer; **production build `cpextended-0.5.0-phase5`** | Phase 5: plain-text search (V-46, V-46b, V-46c) | **Pass**: per-tab results from each tab's own history via Chat Patches' live field and settings (typing, paste, case setting, drafting); clear restores; scroll resets on query change without selection/unread change; empty-view and `searchEmptyShowsFullChat` per tab; live arrivals evaluated immediately; display-only (history, order, unread, config bytes, main chat unchanged). **Fail, approved-design limit:** V-46c (f) invalid regex — Extended keeps the previous results because Chat Patches' error is only in its private `searchError` field (not a P12 handle); owner decision requested. Hidden-entry parts await Phase 7. |
 | X-43 | 2026-10-18 | macOS 26.5.1, Gradle 9.7.1 on JDK 25.0.4, game on Temurin JDK 21.0.8; MC 1.21.11, Loader 0.19.5, Chat Patches 8.0.0; Fabric client gametest, singleplayer; **production build `cpextended-0.5.0-phase5`** | Phase 5: regex mode and failures (V-46d, V-40, V-46e, V-51, V-52) | **Pass**: regex mode shows only Chat Patches' own results (identity), "Partial results" for later arrivals; no regex in the jar (static scan, detector validated on positive controls). V-40: visibility shown/hidden, mouse and Enter-key toggles (focus set programmatically), conservative reservation on read failure. V-46e: three forced read failures → search off, one warning, no degraded mode, routing unaffected. V-51 warning counts; V-52 unusual valid values. |
 | X-44 | 2026-10-18 | macOS 26.5.1, Gradle 9.7.1 on JDK 25.0.4, game on Temurin JDK 21.0.8; MC 1.21.11, Loader 0.19.5, Chat Patches 8.0.0; Fabric client gametest, singleplayer; **production build `cpextended-0.5.0-phase5`** | Phase 5: search performance (V-13) | **Pass**: 16,384 messages, 10 tabs, 5 large windows: Extended's chat-open render max 2.0 ms (arrivals at 50/s), 1.4 ms (regex), 3.6 ms (rapid typing); 0 full rebuilds from arrivals (incremental, including cap trimming); ≤ 1 rebuild per visible window per query change. Whole-game frame times and mixed hiding not measured. |
+| X-45 | 2026-10-18 | macOS 26.5.1, Gradle 9.7.1 on JDK 25.0.4, game on Temurin JDK 21.0.8; MC 1.21.11, Loader 0.19.5, Chat Patches 8.0.0; Fabric client gametest, singleplayer; **production build `cpextended-0.5.1-phase5`** | Phase 5 correction: P12 amendment A-P12-1 (`searchError`), invalid regex (V-46c (f)), V-46e, V-59.4 (+ `conflict_error`), full regression | **Pass**, 135/135. V-46c (f) now **passes**: Chat Patches' invalid-regex state read through the guarded handle; tabs show full history with "Invalid search expression", never stale results; recovery to valid expressions exact with no duplicates; histories, unread, config and main chat preserved. `searchError` read failure and uninterpretable value → Class Q; a conflicting same-named field is refused (ambiguous). No mixin changes; no regex in Extended. Supersedes X-42's invalid-regex failure. |
 
 X-01 supports R2–R4. It doesn't test RE2/J, and no RE2/J test has been run.
 
@@ -82,6 +83,8 @@ X-31 to X-35 ran against the **production** Phase 3 code (branch `phase3`): [`ve
 X-36 to X-40 ran against the **production** Phase 4 code (branch `phase4`): [`verification/phase4/`](../verification/phase4/README.md). The tab-relocation checks deferred in Phase 3 are now executed.
 
 X-41 to X-44 ran against the **production** Phase 5 code (branch `phase5`): [`verification/phase5/`](../verification/phase5/README.md). One recorded failure: invalid-regex detection (V-46c (f)), pending an owner decision on a `searchError` handle.
+
+X-45 ran against the corrected Phase 5 code (owner-approved P12 amendment A-P12-1): [`verification/phase5-correction/`](../verification/phase5-correction/README.md). V-46c (f) passes; Phase 5 checks all pass.
 
 ## 2. Test environment (baseline, D11 / Q5)
 
@@ -122,7 +125,7 @@ X-41 to X-44 ran against the **production** Phase 5 code (branch `phase5`): [`ve
 
 **P13 gate (decisions.md §1.3c):** V-46, V-46b, V-46c and V-13, plus the retained Q29a/Q29b/Q31 and P12 gates (incl. V-46e, V-59 for Class Q handling), must pass before implementation relies on P13.
 
-**P12 gate (decisions.md §1.3c):** V-59, V-40, V-46, V-46c, V-46e, V-51 and V-52 must pass before implementation relies on P12.
+**P12 gate (decisions.md §1.3c):** V-59, V-40, V-46, V-46c, V-46e, V-51 and V-52 must pass before implementation relies on P12. **Amendment A-P12-1** (third handle `searchError`) adds: V-59 (1) also resolves `searchError` (instance, declared `PatternSyntaxException`); V-59 (4) also with a test mod adding a same-named `searchError` field; V-46c (f) invalid regex → no stale results, "Invalid search expression", recovery on a corrected expression; V-46e also with the `searchError` read failing and returning an uninterpretable value.
 
 **Q33 (approved):** V-41c, V-41d and V-41e verify drop resolution.
 

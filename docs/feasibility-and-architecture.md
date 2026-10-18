@@ -525,6 +525,7 @@ M4 applies `cleared = adapter.vanillaClearing() || !history` after the wrapped c
   - Query changes never touch routing, hiding, history or unread.
   - Q31 regex behaviour unchanged; no Extended regex engine.
   - **No P1 change, no new mixins.** A failure that also affects a Class S dependency follows the safety-critical rules (P9).
+  - **Amendment A-P12-1 (owner-approved, Phase 5 correction):** a third handle, instance `searchError` on `ChatScreen` (declared type `java.util.regex.PatternSyntaxException`, compared by name; verified with `javap` on the 8.0.0 jar: set when `Pattern.compile` fails in regex mode, cleared to null on a successful compile, in non-regex mode and for an empty query; while set, Chat Patches skips its result update and shows its full chat). Same exact-name, instance and F-1 ambiguity checks; any failure is Class Q. Read once per frame only in regex mode with an active query; a non-null value that isn't an `IllegalArgumentException` is an interpretation failure (Class Q). Display fallback: every tab shows its full history with an "Invalid search expression" label; Chat Patches' stale result list is never used. Read through a backend seam for fault injection.
 - **Drag-and-drop (Q30b–e Approved):**
   - valid target = the topmost visible, unobstructed strip of another window;
   - a drop on the source window does nothing;

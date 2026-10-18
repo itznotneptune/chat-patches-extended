@@ -76,6 +76,11 @@ final class Phase5Tests {
 		return onClient(() -> ChatOpenRenderer.viewOf(windowId).stream().map(r -> token(r)).toList());
 	}
 
+	static String token2(String s) {
+		int i = s.indexOf("cpx#");
+		return i < 0 ? s : s.substring(i);
+	}
+
 	static String token(MessageRecord r) {
 		String s = r.original() == null ? "" : r.original().getString();
 		int i = s.indexOf("cpx#");
@@ -361,20 +366,106 @@ final class Phase5Tests {
 		ctx.runOnClient(c -> ChatPatches.config.regex = false);
 		ev.result("V-46d", onlyCpResults && lateNotShown && partial == TabSearch.Indicator.PARTIAL && unchanged, "observed", m,
 				"note", "no regex in Extended: the build contains no java.util.regex reference (metadata-check.json, regexReferences); hidden-entry part needs hiding (Phase 7)");
-		// invalid regex: Chat Patches shows an error and its full chat; Extended can't see the error state through the approved P12 handles
+		v46cInvalidRegex(sp);
+	}
+
+	/** V-46c (f), invalid regex, with the P12 searchError handle: no stale results, histories intact, recovery exact. */
+	void v46cInvalidRegex(TestSingleplayerContext sp) {
+		Map<String, Object> m = new LinkedHashMap<>();
 		ctx.runOnClient(c -> ChatPatches.config.regex = true);
 		p3.openChat("");
 		query(".*apple.*");
 		List<String> validView = view("s-v");
+		Map<String, List<Long>> entriesBefore = entries();
+		Map<String, Integer> unreadBefore = unreadAll();
+		byte[] cfgBefore = Phase2Tests.bytes(Phase2Tests.cfg());
+		List<GuiMessage> mainBefore = onClient(() -> new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat())));
 		query("([unclosed");
+		boolean cpReportsError = onClient(() -> cpSearchError() != null);
+		var regexState = onClient(() -> ChatPatchesAdapter.get().regexState((ChatScreen) Minecraft.getInstance().screen));
 		List<String> invalidView = view("s-v");
-		boolean filtered = onClient(() -> TabSearch.state().active());
+		List<String> fullSv = onClient(() -> SessionMirror.get().tab("sv").entries().stream().map(Phase5Tests::token).toList());
+		boolean noStale = invalidView.equals(fullSv) && !invalidView.equals(validView);
+		TabSearch.Indicator indInvalid = indicator("s-v");
+		TabSearch.Indicator indInvalidZ = indicator("s-z");
+		ctx.takeScreenshot("p5-search-invalid-regex");
+		// a message arriving while the expression is invalid: routed normally, shown in the (full) view
+		t.sys(sp, "apple during invalid cpx#SV-6");
+		t.waitT(4);
+		boolean arrivalShown = view("s-v").contains("cpx#SV-6");
+		boolean routedNormally = t.tabEntries("sv").stream().anyMatch(r -> token(r).equals("cpx#SV-6")) && t.mainChatContains("cpx#SV-6");
+		// another invalid expression: still no stale results
+		query("(?<bad");
+		boolean secondInvalid = indicator("s-v") == TabSearch.Indicator.INVALID && view("s-v").size() == fullSv.size() + 1;
+		// corrected to the previous valid expression: Chat Patches' current results, the new arrival included, not partial
+		query(".*apple.*");
+		List<String> corrected = view("s-v");
+		List<Long> correctedSeqs = onClient(() -> ChatOpenRenderer.viewOf("s-v").stream().map(MessageRecord::seq).toList());
+		boolean noDup = correctedSeqs.size() == new java.util.HashSet<>(correctedSeqs).size();
+		boolean correctedOk = corrected.equals(List.of("cpx#SV-1", "cpx#SV-3", "cpx#SV-5", "cpx#SV-6")) && indicator("s-v") == TabSearch.Indicator.NONE && noDup;
+		// corrected to a different valid expression
+		query("([unclosed");
+		query(".*banana.*");
+		boolean differentOk = view("s-v").equals(List.of("cpx#SV-2")) && indicator("s-v") == TabSearch.Indicator.NONE && indicator("s-z") == TabSearch.Indicator.NO_MATCHES;
 		query("");
 		p3.closeChat();
+		// the same text in plain-text mode is an ordinary literal query (no regex anywhere)
 		ctx.runOnClient(c -> ChatPatches.config.regex = false);
-		ev.result("V-46c.invalidRegex", Evidence.Outcome.FAIL, "viewBeforeInvalid", validView, "viewWithInvalidRegex", invalidView, "stillFiltering", filtered,
-				"expected", "no filtering while Chat Patches reports a regex error (S24: it shows the full chat)",
-				"reason", "Chat Patches keeps the error in a private field (searchError) and leaves its previous result list unchanged; reading it needs a third exact-name handle, which P12 doesn't list. Owner decision requested.");
+		p3.openChat("");
+		query("([unclosed");
+		boolean plainLiteral = view("s-v").isEmpty() && indicator("s-v") == TabSearch.Indicator.NO_MATCHES;
+		query("");
+		p3.closeChat();
+		Map<String, List<Long>> entriesAfter = entries();
+		// histories untouched apart from the one new arrival (appended to sv only)
+		entriesAfter.computeIfPresent("sv", (k, v) -> v.subList(0, Math.max(0, v.size() - 1)));
+		boolean preserved = entriesAfter.equals(entriesBefore) && unreadAll().equals(unreadBefore) && Arrays.equals(cfgBefore, Phase2Tests.bytes(Phase2Tests.cfg()));
+		List<GuiMessage> mainAfter = onClient(() -> new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat())));
+		// search never removes or reorders main-chat messages: every earlier message is still there, in order
+		java.util.Set<GuiMessage> beforeSet = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+		beforeSet.addAll(mainBefore);
+		List<GuiMessage> keptInOrder = mainAfter.stream().filter(beforeSet::contains).toList();
+		List<String> added = mainAfter.stream().filter(g -> !beforeSet.contains(g)).map(g -> token2(g.content().getString())).toList();
+		// at the main-chat cap the oldest entries (the end of the newest-first list) may be trimmed by the arrival
+		int removed = mainBefore.size() - keptInOrder.size();
+		boolean onlyOldestTrimmed = AcceptanceTest.sameIdentity(mainBefore.subList(0, keptInOrder.size()), keptInOrder);
+		boolean mainOk = onlyOldestTrimmed && removed <= added.size() && added.contains("cpx#SV-6");
+		m.put("mainChat.sizes", mainBefore.size() + "->" + mainAfter.size());
+		m.put("mainChat.removedFromOldestEnd", removed);
+		m.put("mainChat.capChatMaxMessages", onClient(() -> ChatPatches.config.chatMaxMessages));
+		boolean noFailure = !onClient(() -> ChatPatchesAdapter.get().isSearchIntegrationOff()) && !onClient(() -> ChatPatchesAdapter.get().isDegraded());
+		m.put("chatPatchesReportsError", cpReportsError);
+		m.put("adapterRegexState", String.valueOf(regexState));
+		m.put("viewBeforeInvalid", validView);
+		m.put("viewWithInvalid", invalidView);
+		m.put("indicator.sv", indInvalid);
+		m.put("indicator.sz", indInvalidZ);
+		m.put("noStaleResults.fullHistoryShown", noStale);
+		m.put("arrivalWhileInvalid.shown", arrivalShown);
+		m.put("arrivalWhileInvalid.routedAndInMainChat", routedNormally);
+		m.put("secondInvalidExpression", secondInvalid);
+		m.put("correctedSameExpression", corrected);
+		m.put("correctedNoDuplicates", noDup);
+		m.put("correctedDifferentExpression", differentOk);
+		m.put("plainModeLiteral", plainLiteral);
+		m.put("historiesUnreadConfigPreserved", preserved);
+		m.put("mainChatEarlierMessagesKeptInOrder", mainOk);
+		m.put("mainChat.addedDuringTest", added);
+		m.put("noFailureOrDegraded", noFailure);
+		ev.result("V-46c.invalidRegex", cpReportsError && regexState == ChatPatchesAdapter.RegexState.INVALID && noStale && indInvalid == TabSearch.Indicator.INVALID
+				&& indInvalidZ == TabSearch.Indicator.INVALID && arrivalShown && routedNormally && secondInvalid && correctedOk && differentOk && plainLiteral && preserved && mainOk && noFailure,
+				"observed", m, "fallback", "invalid expression: every tab shows its full history (as Chat Patches' own chat does) marked 'Invalid search expression'; stale results never shown");
+	}
+
+	/** Chat Patches' own error field, read directly by the test (not through Extended). */
+	static Object cpSearchError() {
+		try {
+			Field f = ChatScreen.class.getDeclaredField("searchError");
+			f.setAccessible(true);
+			return f.get(Minecraft.getInstance().screen);
+		} catch (ReflectiveOperationException e) {
+			throw new IllegalStateException(e);
+		}
 	}
 
 	void v40() {
@@ -436,18 +527,21 @@ final class Phase5Tests {
 	void v46e(TestSingleplayerContext sp) {
 		Map<String, Object> m = new LinkedHashMap<>();
 		boolean ok = true;
-		String[] cases = {"a.queryOrSettingsRead", "b.visibilityRead", "c.searchResults"};
+		String[] cases = {"a.queryOrSettingsRead", "b.visibilityRead", "c.searchResults", "d.searchErrorRead", "e.searchErrorUninterpretable"};
 		for (String cs : cases) {
 			ChatPatchesBackend real = onClient(() -> ChatPatchesAdapter.get().devRealBackend());
 			ChatPatchesBackend faulty = switch (cs) {
 				case "a.queryOrSettingsRead" -> new Phase3Tests.DelegatingBackend(real) { @Override public boolean searchCaseSensitive() { throw new IllegalStateException("test: query side unreadable"); } };
 				case "b.visibilityRead" -> new Phase3Tests.DelegatingBackend(real) { @Override public boolean searchEnabled() { throw new IllegalStateException("test: visibility unreadable"); } };
-				default -> new Phase3Tests.DelegatingBackend(real) { @Override public java.util.List<GuiMessage> searchResults(ChatScreen s) { throw new IllegalStateException("test: results unreadable"); } };
+				case "c.searchResults" -> new Phase3Tests.DelegatingBackend(real) { @Override public java.util.List<GuiMessage> searchResults(ChatScreen s) { throw new IllegalStateException("test: results unreadable"); } };
+				case "d.searchErrorRead" -> new Phase3Tests.DelegatingBackend(real) { @Override public Object searchError(Field h, ChatScreen s) { throw new IllegalStateException("test: searchError unreadable"); } };
+				default -> new Phase3Tests.DelegatingBackend(real) { @Override public Object searchError(Field h, ChatScreen s) { return "not an exception"; } };
 			};
 			ctx.runOnClient(c -> { Warnings.devReset(); ChatPatchesAdapter.get().devReplaceBackend(faulty); ChatPatchesAdapter.get().selfCheck(); });
-			if (cs.startsWith("c")) ctx.runOnClient(c -> ChatPatches.config.regex = true);
+			boolean regexCase = cs.startsWith("c") || cs.startsWith("d") || cs.startsWith("e");
+			if (regexCase) ctx.runOnClient(c -> ChatPatches.config.regex = true);
 			p3.openChat("");
-			query(cs.startsWith("c") ? ".*apple.*" : "apple");
+			query(regexCase ? ".*apple.*" : "apple");
 			boolean searchOff = onClient(() -> !TabSearch.state().active()) && view("s-v").size() >= 2;
 			boolean integrationOff = onClient(() -> ChatPatchesAdapter.get().isSearchIntegrationOff());
 			String region = onClient(() -> {

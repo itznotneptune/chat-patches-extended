@@ -35,4 +35,6 @@ public interface ChatPatchesBackend {
 	boolean searchEmptyShowsFullChat();
 	/** {@code ChatScreenAccess.getSearchResults()}: Chat Patches' current main-chat search results. */
 	java.util.List<net.minecraft.client.GuiMessage> searchResults(ChatScreen screen);
+	/** Reads the resolved {@code searchError} handle (P12 amendment); a seam for fault injection. */
+	Object searchError(java.lang.reflect.Field handle, ChatScreen screen) throws ReflectiveOperationException;
 }

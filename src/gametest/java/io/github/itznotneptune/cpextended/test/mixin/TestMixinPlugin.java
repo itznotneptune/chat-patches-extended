@@ -19,6 +19,7 @@ public final class TestMixinPlugin implements IMixinConfigPlugin {
 		String mode = Mode.read();
 		if (mixinClassName.endsWith("ConflictBooleanMixin")) return mode.equals("conflict_bool");
 		if (mixinClassName.endsWith("ConflictIntMixin")) return mode.equals("conflict_int");
+		if (mixinClassName.endsWith("ConflictErrorMixin")) return mode.equals("conflict_error");
 		return !mode.startsWith("structural");
 	}
 

@@ -8,7 +8,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
 /**
- * P12 exact-name handles for Chat Patches' {@code ChatScreen} search state, with the Phase 0 F-1 safeguard: a field is
+ * P12 exact-name handles for Chat Patches' {@code ChatScreen} search state ({@code showSearchBar}, {@code searchField} and,
+ * by the Phase 5 amendment, {@code searchError}), with the Phase 0 F-1 safeguard: a field is
  * used only if exactly one field has the exact name <em>and</em> Mixin hasn't renamed Chat Patches' own copy
  * ({@code <hash>$chatpatches$<name>$<n>}), which happens when another mod adds a same-named field. Anything else is a
  * Class Q failure; types and positions are never guessed.
@@ -16,6 +17,9 @@ import java.lang.reflect.Modifier;
 public final class SearchFieldHandles {
 	public static final String SHOW_SEARCH_BAR = "showSearchBar";
 	public static final String SEARCH_FIELD = "searchField";
+	public static final String SEARCH_ERROR = "searchError";
+	/** Chat Patches 8.0.0's declared type of {@code searchError}; compared by name so Extended never references the regex API. */
+	static final String SEARCH_ERROR_TYPE = "java.util.regex.PatternSyntaxException";
 
 	/** Outcome of resolving one handle; {@code field} is null on failure, with the reason in {@code error}. */
 	public record Resolution(Field field, String error) {
@@ -25,6 +29,11 @@ public final class SearchFieldHandles {
 	private SearchFieldHandles() {}
 
 	public static Resolution resolve(Class<?> owner, String name, boolean expectStatic, Class<?> expectedType) {
+		return resolve(owner, name, expectStatic, expectedType, null);
+	}
+
+	/** As above; with {@code expectedTypeName} set, the field's declared type must have exactly that name instead. */
+	public static Resolution resolve(Class<?> owner, String name, boolean expectStatic, Class<?> expectedType, String expectedTypeName) {
 		Field exact = null;
 		int exactCount = 0;
 		boolean renamedVariant = false;
@@ -45,7 +54,8 @@ public final class SearchFieldHandles {
 			return new Resolution(null, "ambiguous (exact matches=" + exactCount + ", renamed Chat Patches variant=" + renamedVariant + ")");
 		}
 		if (Modifier.isStatic(exact.getModifiers()) != expectStatic) return new Resolution(null, expectStatic ? "not static" : "unexpectedly static");
-		boolean typeOk = expectedType.isPrimitive() ? exact.getType() == expectedType : expectedType.isAssignableFrom(exact.getType());
+		boolean typeOk = expectedTypeName != null ? exact.getType().getName().equals(expectedTypeName) && expectedType.isAssignableFrom(exact.getType())
+				: expectedType.isPrimitive() ? exact.getType() == expectedType : expectedType.isAssignableFrom(exact.getType());
 		if (!typeOk) return new Resolution(null, "wrong type " + exact.getType().getName());
 		try {
 			exact.setAccessible(true);
@@ -61,5 +71,10 @@ public final class SearchFieldHandles {
 
 	static Resolution resolveSearchField() {
 		return resolve(ChatScreen.class, SEARCH_FIELD, false, EditBox.class);
+	}
+
+	/** Instance field; null while the current query is valid (or regex mode is off), the compile error otherwise. */
+	static Resolution resolveSearchError() {
+		return resolve(ChatScreen.class, SEARCH_ERROR, false, IllegalArgumentException.class, SEARCH_ERROR_TYPE);
 	}
 }

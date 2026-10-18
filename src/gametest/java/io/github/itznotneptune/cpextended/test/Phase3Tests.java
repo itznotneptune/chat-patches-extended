@@ -1052,5 +1052,6 @@ final class Phase3Tests {
 		@Override public boolean searchRegex() { return real.searchRegex(); }
 		@Override public boolean searchEmptyShowsFullChat() { return real.searchEmptyShowsFullChat(); }
 		@Override public java.util.List<net.minecraft.client.GuiMessage> searchResults(ChatScreen s) { return real.searchResults(s); }
+		@Override public Object searchError(java.lang.reflect.Field h, ChatScreen s) throws ReflectiveOperationException { return real.searchError(h, s); }
 	}
 }

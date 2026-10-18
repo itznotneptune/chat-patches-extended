@@ -11,7 +11,8 @@
     "FrameProbeMixin",
     "ChatScreenCounterMixin",
     "ConflictBooleanMixin",
-    "ConflictIntMixin"
+    "ConflictIntMixin",
+    "ConflictErrorMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }

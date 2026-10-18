@@ -33,18 +33,20 @@ import java.util.Set;
  * <li>regex mode (Q31): an entry matches only if Chat Patches' own result list holds its message (identity). Extended
  * never runs a regex. Entries Chat Patches didn't evaluate (later arrivals) are reported as partial results;</li>
  * <li>zero matches: the tab's full history if {@code searchEmptyShowsFullChat}, else an empty view with "No matches".</li>
+ * <li>invalid regex (Chat Patches' {@code searchError}, P12 amendment): like Chat Patches' own chat, every tab shows its
+ * full history, marked "Invalid search expression"; Chat Patches' stale result list is never used as matches.</li>
  * </ul>
  */
 public final class TabSearch {
-	public enum Indicator { NONE, NO_MATCHES, PARTIAL }
+	public enum Indicator { NONE, NO_MATCHES, PARTIAL, INVALID }
 
 	/** What a window shows for one tab this frame. {@code entries} is oldest first. */
 	public record View(boolean searching, List<MessageRecord> entries, Indicator indicator) {}
 
 	/** The search state read once per frame. */
 	public record State(boolean active, String query, boolean caseSensitive, boolean regex, boolean emptyShowsFull,
-			@Nullable Set<GuiMessage> regexResults, long signature) {
-		static final State INACTIVE = new State(false, "", false, false, false, null, 0);
+			@Nullable Set<GuiMessage> regexResults, boolean invalidRegex, long signature) {
+		static final State INACTIVE = new State(false, "", false, false, false, null, false, 0);
 	}
 
 	private static final class Cache {
@@ -61,6 +63,7 @@ public final class TabSearch {
 	/** Highest record sequence present when Chat Patches last (re)evaluated its results (regex partial indicator). */
 	private static long evaluatedUpTo;
 	private static long lastRegexSignature;
+	private static String lastRegexQuery = "";
 
 	private TabSearch() {}
 
@@ -87,6 +90,14 @@ public final class TabSearch {
 		Set<GuiMessage> results = null;
 		long sig = Objects.hash(q.query(), s.caseSensitive(), s.regex(), s.emptyShowsFullChat());
 		if (s.regex()) {
+			switch (a.regexState(screen)) {
+				case FAILED: return State.INACTIVE; // Class Q, already reported: search integration off
+				case INVALID:
+					// Chat Patches' results are stale for this query; the next valid query must count as a fresh evaluation.
+					lastRegexSignature = Long.MIN_VALUE;
+					return new State(true, q.query(), s.caseSensitive(), true, s.emptyShowsFullChat(), null, true, sig * 31 + 7);
+				case VALID: break;
+			}
 			List<GuiMessage> list = a.searchResults(screen);
 			if (list == null) return State.INACTIVE; // regex-mode tab results unavailable (Class Q, already reported)
 			long rs = list.size();
@@ -97,14 +108,15 @@ public final class TabSearch {
 				results = Collections.newSetFromMap(new IdentityHashMap<>(list.size() * 2 + 1));
 				results.addAll(list);
 			}
-			if (rs != lastRegexSignature) {
-				// Chat Patches re-evaluated its results: everything present now was evaluated by it.
+			if (rs != lastRegexSignature || !q.query().equals(lastRegexQuery)) {
+				// Chat Patches re-evaluates on every field change: everything present now was evaluated by it.
 				lastRegexSignature = rs;
+				lastRegexQuery = q.query();
 				evaluatedUpTo = maxSeq();
 			}
 			sig = sig * 31 + rs;
 		}
-		return new State(true, q.query(), s.caseSensitive(), s.regex(), s.emptyShowsFullChat(), results, sig == 0 ? 1 : sig);
+		return new State(true, q.query(), s.caseSensitive(), s.regex(), s.emptyShowsFullChat(), results, false, sig == 0 ? 1 : sig);
 	}
 
 	private static long maxSeq() {
@@ -122,6 +134,7 @@ public final class TabSearch {
 		List<MessageRecord> all = tab == null ? List.of() : tab.entries();
 		State s = state;
 		if (!s.active()) return new View(false, all, Indicator.NONE);
+		if (s.invalidRegex()) return new View(true, all, Indicator.INVALID); // no matches claimed; the cache is left alone
 		Cache c = CACHES.computeIfAbsent(tabId, k -> new Cache());
 		if (c.signature != s.signature() || tab == null || c.structureVersion != tab.structureVersion()) {
 			rebuild(c, s, all, tab);

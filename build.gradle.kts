@@ -15,7 +15,7 @@ val cpVariant = (project.findProperty("cpVariant") as String?) ?: "real"
 
 // Fabric API modules the mod actually uses (P15, V-15). Each is declared in fabric.mod.json with a lower bound at the
 // version tested here. Nothing else from Fabric API is on the main compile classpath.
-val fabricModules = listOf("fabric-lifecycle-events-v1", "fabric-rendering-v1", "fabric-screen-api-v1")
+val fabricModules = listOf("fabric-lifecycle-events-v1", "fabric-rendering-v1", "fabric-screen-api-v1", "fabric-key-binding-api-v1")
 
 repositories {
     mavenCentral()
@@ -61,6 +61,9 @@ dependencies {
     modImplementation("net.fabricmc:fabric-loader:$loaderVersion")
     for (m in fabricModules) modImplementation(fabricApi.module(m, fabricApiVersion))
 
+    // Optional Mod Menu integration (Q20): compile-only; present at dev runtime only with -Pextras=modmenu (V-14, V-38).
+    modCompileOnly("maven.modrinth:modmenu:${project.property("modmenu_version")}")
+
     // Chat Patches is never bundled (Q5): compile against it, and vary its runtime presence for V-35.
     modCompileOnly("maven.modrinth:chatpatches:$chatPatchesVersion")
 
@@ -84,6 +87,16 @@ dependencies {
     }
 }
 
+// Optional mods for compatibility runs: -Pextras=modmenu,ncr
+val extras = ((project.findProperty("extras") as String?) ?: "").split(",").filter { it.isNotBlank() }
+dependencies {
+    if ("modmenu" in extras) {
+        modLocalRuntime("maven.modrinth:modmenu:${project.property("modmenu_version")}")
+        modLocalRuntime("maven.modrinth:placeholder-api:${project.property("placeholder_api_version")}")
+    }
+    if ("ncr" in extras) modLocalRuntime("maven.modrinth:no-chat-reports:${project.property("ncr_version")}")
+}
+
 tasks.processResources {
     val props = mapOf(
         "version" to project.version,
@@ -91,6 +104,7 @@ tasks.processResources {
         "lifecycle_version" to fabricApi.moduleVersion("fabric-lifecycle-events-v1", fabricApiVersion),
         "rendering_version" to fabricApi.moduleVersion("fabric-rendering-v1", fabricApiVersion),
         "screen_version" to fabricApi.moduleVersion("fabric-screen-api-v1", fabricApiVersion),
+        "keybinding_version" to fabricApi.moduleVersion("fabric-key-binding-api-v1", fabricApiVersion),
     )
     inputs.properties(props)
     filesMatching("fabric.mod.json") { expand(props) }

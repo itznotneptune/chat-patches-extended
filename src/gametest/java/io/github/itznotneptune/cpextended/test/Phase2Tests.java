@@ -67,6 +67,15 @@ final class Phase2Tests {
 		}
 	}
 
+	/** Writes a JSON tree the way the mod does (lone surrogates and control characters escaped). */
+	static void writeJson(Path p, JsonObject j) {
+		try {
+			Files.write(p, io.github.itznotneptune.cpextended.config.ConfigWriter.toBytes(j));
+		} catch (IOException e) {
+			throw new IllegalStateException(e);
+		}
+	}
+
 	static byte[] bytes(Path p) {
 		try {
 			return Files.exists(p) ? Files.readAllBytes(p) : null;

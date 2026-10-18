@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Acceptance run (Milestones 1a, 1b, Phases 2 and 3) from a clean run directory, then evidence collection.
-# Usage: tools/run-all.sh [output-dir]   (default verification/phase3; earlier evidence directories are left as recorded)
+# Acceptance run (Milestones 1a, 1b, Phases 2-4) from a clean run directory, then evidence collection.
+# Usage: tools/run-all.sh [output-dir]   (default verification/phase4; earlier evidence directories are left as recorded)
 set -u
 root="$(cd "$(dirname "$0")/.." && pwd)"; cd "$root"
-run="build/run/clientGameTest"; logs="build/m1a-logs"; out="${1:-verification/phase3}"
+run="build/run/clientGameTest"; logs="build/m1a-logs"; out="${1:-verification/phase4}"
 export JAVA_HOME="$(/usr/libexec/java_home -v 25)"
 rm -rf build/run build/libs "$logs" "$out"; mkdir -p "$run" "$logs" "$out/evidence" "$out/logs"
 
@@ -35,17 +35,22 @@ echo "== phase 3: chat-open interaction and unread"
 tools/run-mode.sh interact
 tools/run-mode.sh unread
 
+echo "== phase 4: configuration GUI, keybind, Mod Menu, tab relocation"
+for m in gui drag keys scales; do tools/run-mode.sh $m; done
+tools/run-mode.sh extras "cpextended.debug=true" -Pextras=modmenu,ncr
+
 echo "== V-35"; tools/run-v35.sh | tee "$out/evidence/v35-summary.txt"
 
 echo "== collect"
 cp "$run"/cpx-evidence/*.jsonl "$run"/cpx-evidence/*-mainchat.txt "$run"/cpx-evidence/*-chatlog.json "$out/evidence/" 2>/dev/null
 cp "$logs/compileClasspath.txt" "$out/evidence/"
-mkdir -p "$out/evidence/screenshots" && cp "$run"/screenshots/*p2-hud-*.png "$run"/screenshots/*p3-*.png "$out/evidence/screenshots/" 2>/dev/null
+mkdir -p "$out/evidence/screenshots" && cp "$run"/screenshots/*p2-hud-*.png "$run"/screenshots/*p3-*.png "$run"/screenshots/*p4-*.png "$out/evidence/screenshots/" 2>/dev/null
 jar=$(ls build/libs/cpextended-*.jar | grep -v sources | head -1)
 unzip -p "$jar" fabric.mod.json > "$out/evidence/release-fabric.mod.json"
 unzip -l "$jar" | awk 'NR>3 {print $4}' | grep -v '^$' > "$out/evidence/release-jar-contents.txt"
 for f in "$logs"/*.log; do
   sed -e "s#$HOME#~#g" "$f" | gzip -9 > "$out/logs/$(basename "$f").gz"
 done
+python3 -I tools/check_metadata.py "$jar" src/main/java "$logs"/live.log "$logs"/gui.log "$logs"/extras.log > "$out/evidence/metadata-check.json"
 python3 -I tools/summarize_m1a.py "$out/evidence" > "$out/results-table.md"
 echo "done"

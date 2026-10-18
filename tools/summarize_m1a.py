@@ -17,6 +17,10 @@ cmp_path = d / "structural-compare.json"
 if cmp_path.exists():
     c = json.loads(cmp_path.read_text())
     rows.append(("structural_*", c["test"], c["outcome"], json.dumps(c["details"])))
+meta_path = d / "metadata-check.json"
+if meta_path.exists():
+    c = json.loads(meta_path.read_text())
+    rows.append(("build", c["test"], c["outcome"], json.dumps({k: v for k, v in c.items() if k not in ("test", "outcome")})))
 v35 = d / "v35-summary.txt"
 if v35.exists():
     for line in v35.read_text().splitlines():

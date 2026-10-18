@@ -20,6 +20,8 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Style;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Arrays;
+
 /**
  * Chat-open rendering hooks and P11 input for the {@link ChatScreen}, through Fabric's per-screen events only.
  * Precedence: an open Chat Patches context menu passes every click; then any visible protected region passes; then the
@@ -27,12 +29,22 @@ import org.jetbrains.annotations.Nullable;
  * Left button: tab select, window move (strip background), resize (grip), scrollbar, text clicks via vanilla's handler.
  * Right button over a window: consumed, no action. Other buttons pass. A consumed event never reaches the screen, so the
  * chat input keeps focus, text, selection and cursor. Drags are captured until release and cancelled when the screen
- * closes (the window keeps its last committed geometry). Moving tabs between windows is not part of this phase.
+ * closes (the window keeps its last committed geometry). A press on a tab selects it on release unless the pointer
+ * moved: then it's a tab drag, resolved on release by Q33 (first match wins): another window's topmost unobstructed strip
+ * moves the tab there; the source window is a no-op; a protected region cancels; another window's body or an obscured
+ * strip cancels; empty space (including where only hidden or disabled windows are) creates a new window with the tab.
+ * Esc or any screen change cancels. An overflowing tab strip scrolls with its arrows or the wheel.
  */
 public final class ChatScreenInput {
-	enum Kind { MOVE, RESIZE, SCROLLBAR }
+	enum Kind { MOVE, RESIZE, SCROLLBAR, TAB_PRESS, TAB }
 
-	private record Drag(Kind kind, String windowId, double grabX, double grabY, int[] startRect, int[] layoutBody, int maxScroll) {}
+	/** Q33 outcome of the last tab drop (verification and diagnostics). */
+	public enum Drop { MOVED, NO_OP_SOURCE, CANCELLED_PROTECTED, CANCELLED_OTHER_WINDOW, NEW_WINDOW, CANCELLED_CLOSED, REFUSED }
+
+	private record Drag(Kind kind, String windowId, double grabX, double grabY, int[] startRect, int[] layoutBody, int maxScroll, @Nullable String tabId) {}
+
+	private static @Nullable Drop lastDrop;
+	private static @Nullable String lastDropDetail;
 
 	private static @Nullable Drag drag;
 	private static int[] dragRect;
@@ -77,9 +89,19 @@ public final class ChatScreenInput {
 			scrollbarTo(top.windowId(), top.body(), top.maxScroll(), y);
 			return false;
 		}
+		if (ChatOpenRenderer.in(top.leftArrow(), x, y)) {
+			ChatOpenRenderer.scrollTabs(top.windowId(), -1);
+			return false;
+		}
+		if (ChatOpenRenderer.in(top.rightArrow(), x, y)) {
+			if (top.firstTab() + top.tabs().size() < top.allTabs()) ChatOpenRenderer.scrollTabs(top.windowId(), 1);
+			return false;
+		}
 		for (ChatOpenRenderer.TabSlot slot : top.tabs()) {
 			if (slot.contains(x, y)) {
-				selectTab(top.windowId(), slot.tabId());
+				// select on release, or start a tab drag if the pointer moves first
+				drag = new Drag(Kind.TAB_PRESS, top.windowId(), x, y, top.rect().clone(), top.body().clone(), top.maxScroll(), slot.tabId());
+				dragRect = null;
 				return false;
 			}
 		}
@@ -105,6 +127,10 @@ public final class ChatScreenInput {
 		if (top == null || vertical == 0) return true;
 		consumedScrolls++;
 		bringToFront(top.windowId());
+		if (ChatOpenRenderer.in(top.strip(), x, y) && top.allTabs() > top.tabs().size()) {
+			ChatOpenRenderer.scrollTabs(top.windowId(), vertical > 0 ? -1 : 1);
+			return false;
+		}
 		int lines = (int) Math.signum(vertical) * (Minecraft.getInstance().hasShiftDown() ? 1 : 7); // vanilla's chat step
 		ChatOpenRenderer.scroll(top.windowId(), lines);
 		return false;
@@ -115,6 +141,11 @@ public final class ChatScreenInput {
 		if (d == null) return true;
 		if (e.button() != 0) return false; // captured: nothing else acts while the left-button drag lasts
 		int sw = screen.width, sh = screen.height;
+		if (d.kind() == Kind.TAB_PRESS) {
+			if (Math.abs(e.x() - d.grabX()) + Math.abs(e.y() - d.grabY()) >= 4) drag = new Drag(Kind.TAB, d.windowId(), d.grabX(), d.grabY(), d.startRect(), d.layoutBody(), d.maxScroll(), d.tabId());
+			return false;
+		}
+		if (d.kind() == Kind.TAB) return false; // captured: the ghost follows the cursor; the drop is resolved on release
 		switch (d.kind()) {
 			case MOVE -> {
 				int[] r = {(int) Math.round(e.x() - d.grabX()), (int) Math.round(e.y() - d.grabY()), d.startRect()[2], d.startRect()[3]};
@@ -129,6 +160,7 @@ public final class ChatScreenInput {
 				RenderSupport.setOverride(d.windowId(), dragRect);
 			}
 			case SCROLLBAR -> scrollbarTo(d.windowId(), d.layoutBody(), d.maxScroll(), e.y());
+			default -> {}
 		}
 		return false;
 	}
@@ -137,6 +169,14 @@ public final class ChatScreenInput {
 		Drag d = drag;
 		if (d == null) return true;
 		drag = null;
+		if (d.kind() == Kind.TAB_PRESS) {
+			selectTab(d.windowId(), d.tabId());
+			return false;
+		}
+		if (d.kind() == Kind.TAB) {
+			drop((ChatScreen) screen, d, e.x(), e.y());
+			return false;
+		}
 		if (d.kind() != Kind.SCROLLBAR && dragRect != null) commitGeometry(d.windowId(), dragRect, screen.width, screen.height);
 		RenderSupport.setOverride(d.windowId(), null);
 		dragRect = null;
@@ -150,14 +190,44 @@ public final class ChatScreenInput {
 		drag = null;
 		dragRect = null;
 		RenderSupport.setOverride(d.windowId(), null);
+		if (d.kind() == Kind.TAB) recordDrop(Drop.CANCELLED_CLOSED, why);
 		Diagnostics.event("drag_cancelled", "kind", d.kind(), "window", d.windowId(), "why", why);
+	}
+
+	/** Q33 drop resolution, first match wins. */
+	static void drop(ChatScreen s, Drag d, double x, double y) {
+		String region = HitTester.protectedRegion(s, x, y);
+		ChatOpenRenderer.Layout top = ChatOpenRenderer.topAt(x, y);
+		if (top != null && !top.windowId().equals(d.windowId()) && ChatOpenRenderer.in(top.strip(), x, y) && region == null) {
+			var o = TabMoves.moveToWindow(d.tabId(), top.windowId()); // (1) topmost visible, unobstructed strip of another window
+			recordDrop(o.applied() ? Drop.MOVED : Drop.REFUSED, o.applied() ? top.windowId() : String.valueOf(o.edit().reason()));
+		} else if (top != null && top.windowId().equals(d.windowId())) {
+			recordDrop(Drop.NO_OP_SOURCE, null); // (2) the source window
+		} else if (region != null) {
+			recordDrop(Drop.CANCELLED_PROTECTED, region); // (3) protected vanilla or Chat Patches region
+		} else if (top != null) {
+			recordDrop(Drop.CANCELLED_OTHER_WINDOW, top.windowId()); // (4) another window's body or an obscured strip
+		} else {
+			// (5) empty space (hidden and disabled windows aren't drawn, so their area counts as empty): a new window,
+			// sized like the source, centred on the drop point and clamped fully on-screen.
+			int w = d.startRect()[2], h = d.startRect()[3];
+			int[] r = clampOnScreen(new int[]{(int) Math.round(x - w / 2.0), (int) Math.round(y - ChatOpenRenderer.STRIP_H / 2.0), w, h}, s.width, s.height);
+			var o = TabMoves.moveToNewWindow(d.tabId(), r[0] / (double) s.width, r[1] / (double) s.height, w / (double) s.width, h / (double) s.height);
+			recordDrop(o.applied() ? Drop.NEW_WINDOW : Drop.REFUSED, o.applied() ? Arrays.toString(r) : String.valueOf(o.edit().reason()));
+		}
+	}
+
+	private static void recordDrop(Drop drop, @Nullable String detail) {
+		lastDrop = drop;
+		lastDropDetail = detail;
+		Diagnostics.event("tab_drop", "outcome", drop, "detail", detail);
 	}
 
 	private static void startDrag(Kind kind, ChatOpenRenderer.Layout top, double x, double y) {
 		int[] r = top.rect().clone();
 		double grabX = kind == Kind.MOVE ? x - r[0] : x;
 		double grabY = kind == Kind.MOVE ? y - r[1] : y;
-		drag = new Drag(kind, top.windowId(), grabX, grabY, r, top.body().clone(), top.maxScroll());
+		drag = new Drag(kind, top.windowId(), grabX, grabY, r, top.body().clone(), top.maxScroll(), null);
 		dragRect = kind == Kind.SCROLLBAR ? null : r;
 	}
 
@@ -193,7 +263,20 @@ public final class ChatScreenInput {
 		ChatOpenRenderer.setScroll(windowId, 0);
 	}
 
-	public static boolean dragging() { return drag != null; }
+	public static boolean dragging() { return drag != null && drag.kind() != Kind.TAB_PRESS; }
+	public static boolean draggingTab() { return drag != null && drag.kind() == Kind.TAB; }
+	public static @Nullable Drop lastDrop() { return lastDrop; }
+	public static @Nullable String lastDropDetail() { return lastDropDetail; }
+	public static void resetLastDrop() { lastDrop = null; lastDropDetail = null; }
+
+	/** Label of the tab being dragged (for the ghost), or null. */
+	public static @Nullable String draggedTabLabel() {
+		Drag d = drag;
+		if (d == null || d.kind() != Kind.TAB || d.tabId() == null) return null;
+		var w = ConfigManager.get().config().windowOfTab(d.tabId());
+		if (w != null) for (var t : w.tabs()) if (d.tabId().equals(t.id())) return t.config() != null ? t.config().name() : t.id();
+		return d.tabId();
+	}
 	public static long consumedClicks() { return consumedClicks; }
 	public static long consumedScrolls() { return consumedScrolls; }
 }

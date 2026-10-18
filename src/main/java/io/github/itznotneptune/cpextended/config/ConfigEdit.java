@@ -150,6 +150,7 @@ public sealed interface ConfigEdit {
 			if (from == to) return Result.OK;
 			JsonObject t = tab(view, tabId);
 			removeIdentity(from.raw().getAsJsonArray("tabs"), t);
+			reselectAfterRemoval(from.raw(), tabId);
 			JsonElement e = to.raw().get("tabs");
 			if (e != null && !e.isJsonArray()) return Result.rejected("target tabs is not an array in the file");
 			JsonArray arr = e == null ? new JsonArray() : e.getAsJsonArray();
@@ -165,11 +166,114 @@ public sealed interface ConfigEdit {
 			ExtendedConfig.Window from = view.windowOfTab(tabId);
 			if (from == null) return Result.missing("tab " + tabId);
 			removeIdentity(from.raw().getAsJsonArray("tabs"), tab(view, tabId));
+			reselectAfterRemoval(from.raw(), tabId);
+			return Result.OK;
+		}
+	}
+
+	/** Moves a tab (whole raw subtree) into a new enabled window, where it is selected (Q30c, Q33 rule 5). */
+	record MoveTabToNewWindow(String tabId, String newWindowId, double x, double y, double width, double height) implements ConfigEdit {
+		public Result apply(JsonObject root, ExtendedConfig view) {
+			ExtendedConfig.Window from = view.windowOfTab(tabId);
+			if (from == null) return Result.missing("tab " + tabId);
+			if (view.window(newWindowId) != null) return Result.rejected("window id " + newWindowId + " already exists");
+			JsonArray ws = windows(root);
+			if (ws == null) return Result.rejected("windows is not an array in the file; edit the file to fix it");
+			JsonObject t = tab(view, tabId);
+			removeIdentity(from.raw().getAsJsonArray("tabs"), t);
+			reselectAfterRemoval(from.raw(), tabId);
+			JsonObject w = newWindow(newWindowId, x, y, width, height);
+			w.getAsJsonArray("tabs").add(t);
+			w.addProperty("selectedTab", tabId);
+			ws.add(w);
+			return Result.OK;
+		}
+	}
+
+	/** Adds an empty enabled window at the front (Q30e: windows stay until explicitly deleted). */
+	record AddWindow(String windowId, double x, double y, double width, double height) implements ConfigEdit {
+		public Result apply(JsonObject root, ExtendedConfig view) {
+			if (view.window(windowId) != null) return Result.rejected("window id " + windowId + " already exists");
+			JsonArray ws = windows(root);
+			if (ws == null) return Result.rejected("windows is not an array in the file; edit the file to fix it");
+			ws.add(newWindow(windowId, x, y, width, height));
+			return Result.OK;
+		}
+	}
+
+	/** Deletes a window with its tabs. The manager refuses it if that would orphan hidden messages (OrphanGuard). */
+	record DeleteWindow(String windowId) implements ConfigEdit {
+		public Result apply(JsonObject root, ExtendedConfig view) {
+			ExtendedConfig.Window w = view.window(windowId);
+			if (w == null) return Result.missing("window " + windowId);
+			removeIdentity(root.getAsJsonArray("windows"), w.raw());
+			return Result.OK;
+		}
+	}
+
+	/** Adds a tab with the schema defaults (enabled, not hiding, restoring history, no filters) to a window. */
+	record AddTab(String windowId, String tabId, String name) implements ConfigEdit {
+		public Result apply(JsonObject root, ExtendedConfig view) {
+			ExtendedConfig.Window w = view.window(windowId);
+			if (w == null || w.suspended()) return Result.missing("window " + windowId);
+			if (view.windowOfTab(tabId) != null) return Result.rejected("tab id " + tabId + " already exists");
+			JsonElement e = w.raw().get("tabs");
+			if (e != null && !e.isJsonArray()) return Result.rejected("tabs is not an array in the file; edit the file to fix it");
+			JsonArray arr = e == null ? new JsonArray() : e.getAsJsonArray();
+			JsonObject t = new JsonObject();
+			t.addProperty("id", tabId);
+			t.addProperty("name", name);
+			t.addProperty("enabled", true);
+			t.addProperty("hideFromMainChat", false);
+			t.addProperty("restoreHistory", true);
+			t.addProperty("matchAll", false);
+			t.add("include", new JsonArray());
+			t.add("exclude", new JsonArray());
+			arr.add(t);
+			w.raw().add("tabs", arr);
 			return Result.OK;
 		}
 	}
 
 	// ---------------------------------------------------------------- helpers
+
+	/** The windows array, created if absent; null if the file holds something else there (never repaired). */
+	private static @Nullable JsonArray windows(JsonObject root) {
+		JsonElement e = root.get("windows");
+		if (e == null) {
+			JsonArray arr = new JsonArray();
+			root.add("windows", arr);
+			return arr;
+		}
+		return e.isJsonArray() ? e.getAsJsonArray() : null;
+	}
+
+	private static JsonObject newWindow(String id, double x, double y, double width, double height) {
+		JsonObject w = new JsonObject();
+		w.addProperty("id", id);
+		w.addProperty("enabled", true);
+		w.addProperty("anchor", "TOP_LEFT");
+		w.addProperty("x", x);
+		w.addProperty("y", y);
+		w.addProperty("width", width);
+		w.addProperty("height", height);
+		w.add("tabs", new JsonArray());
+		return w;
+	}
+
+	/** When the selected tab leaves a window, select its first remaining tab (or drop the selection if none is left). */
+	private static void reselectAfterRemoval(JsonObject window, String removedTabId) {
+		JsonElement sel = window.get("selectedTab");
+		if (sel == null || !sel.isJsonPrimitive() || !removedTabId.equals(sel.getAsString())) return;
+		JsonArray tabs = window.has("tabs") && window.get("tabs").isJsonArray() ? window.getAsJsonArray("tabs") : new JsonArray();
+		for (JsonElement t : tabs) {
+			if (t.isJsonObject() && t.getAsJsonObject().has("id") && t.getAsJsonObject().get("id").isJsonPrimitive()) {
+				window.addProperty("selectedTab", t.getAsJsonObject().get("id").getAsString());
+				return;
+			}
+		}
+		window.remove("selectedTab");
+	}
 
 	private static @Nullable JsonObject tab(ExtendedConfig view, String tabId) {
 		for (ExtendedConfig.Window w : view.windows()) for (ExtendedConfig.Tab t : w.tabs()) if (tabId.equals(t.id())) return t.raw();

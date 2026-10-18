@@ -8,7 +8,8 @@
   "license": "LGPL-3.0-only",
   "environment": "client",
   "entrypoints": {
-    "client": ["io.github.itznotneptune.cpextended.CpExtended"]
+    "client": ["io.github.itznotneptune.cpextended.CpExtended"],
+    "modmenu": ["io.github.itznotneptune.cpextended.gui.ModMenuEntry"]
   },
   "mixins": ["cpextended.mixins.json"],
   "depends": {
@@ -18,7 +19,8 @@
     "fabricloader": ">=${loader_version}",
     "fabric-lifecycle-events-v1": ">=${lifecycle_version}",
     "fabric-rendering-v1": ">=${rendering_version}",
-    "fabric-screen-api-v1": ">=${screen_version}"
+    "fabric-screen-api-v1": ">=${screen_version}",
+    "fabric-key-binding-api-v1": ">=${keybinding_version}"
   },
   "suggests": {
     "modmenu": "*"

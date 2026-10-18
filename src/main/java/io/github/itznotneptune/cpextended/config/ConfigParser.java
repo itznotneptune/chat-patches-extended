@@ -50,9 +50,18 @@ public final class ConfigParser {
 			if (!e.isJsonObject()) return new Result(Status.UNPARSEABLE, null, "root is not a JSON object");
 			root = e.getAsJsonObject();
 		} catch (IOException | RuntimeException ex) {
-			return new Result(Status.UNPARSEABLE, null, ex.getMessage());
+			return new Result(Status.UNPARSEABLE, null, describe(ex));
 		}
 		return interpret(root);
+	}
+
+	/** A player-facing description of a parse failure: what's wrong and where (no parser internals). */
+	static String describe(Exception ex) {
+		String msg = String.valueOf(ex.getMessage());
+		if (ex instanceof java.nio.charset.CharacterCodingException) return "not valid UTF-8 text";
+		if (msg.startsWith("duplicate key") || msg.startsWith("trailing data") || msg.startsWith("root is")) return msg;
+		java.util.regex.Matcher m = java.util.regex.Pattern.compile("line (\\d+) column (\\d+)").matcher(msg);
+		return m.find() ? "not valid JSON at line " + m.group(1) + ", column " + m.group(2) : "not valid JSON";
 	}
 
 	/** Builds the understood view of an already-parsed tree (also used after in-memory edits). */

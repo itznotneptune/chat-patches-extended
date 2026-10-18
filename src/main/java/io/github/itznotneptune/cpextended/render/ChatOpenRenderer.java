@@ -45,11 +45,20 @@ public final class ChatOpenRenderer {
 	/** One drawn text line: GUI position of its first character, height, scale and contents (for hover and click). */
 	public record LineSlot(int x, int y, int h, double scale, FormattedCharSequence seq) {}
 
-	/** Everything input needs about a window as it was drawn. Rectangles are {x, y, w, h} in GUI pixels. */
+	/**
+	 * Everything input needs about a window as it was drawn. Rectangles are {x, y, w, h} in GUI pixels. When the tabs
+	 * don't fit, the strip scrolls: {@code leftArrow}/{@code rightArrow} are shown (null otherwise) and {@code tabs}
+	 * holds the visible ones; {@code allTabs} counts every tab.
+	 */
 	public record Layout(String windowId, int[] rect, int[] strip, List<TabSlot> tabs, int @Nullable [] lock, int[] body,
-			int @Nullable [] scrollbar, int[] grip, List<LineSlot> lines, int totalLines, int visibleLines, int maxScroll) {
+			int @Nullable [] scrollbar, int[] grip, List<LineSlot> lines, int totalLines, int visibleLines, int maxScroll,
+			int @Nullable [] leftArrow, int @Nullable [] rightArrow, int allTabs, int firstTab, int leftArrowColor, int rightArrowColor) {
 		public boolean contains(double px, double py) { return in(rect, px, py); }
 	}
+
+	static final int ARROW_W = 9;
+	private static final Map<String, Integer> TAB_SCROLL = new HashMap<>();
+	private static final Map<String, String> LAST_SHOWN = new HashMap<>();
 
 	private static final Map<String, Integer> SCROLL = new HashMap<>();
 	/** Layouts of the last frame, front to back. */
@@ -100,11 +109,14 @@ public final class ChatOpenRenderer {
 		g.fill(body[0], body[1], body[0] + body[2], body[1] + body[3], RenderSupport.argb(look.bgOpacity(), 0));
 		g.fill(strip[0], strip[1], strip[0] + strip[2], strip[1] + strip[3], RenderSupport.argb(Math.min(1.0, look.bgOpacity() + 0.35), 0x101010));
 
-		// Tabs: name, unread badge, error marker.
+		// Tabs: name, unread badge, error marker. When they don't fit, the strip scrolls with arrows at its ends.
 		ExtendedConfig.Tab shown = w.shownTab();
-		List<TabSlot> slots = new ArrayList<>();
-		int x = strip[0] + 2;
 		int lockSpace = ConfigManager.get().state() == ConfigManager.State.NORMAL ? 0 : 12;
+		List<ExtendedConfig.Tab> tabs = new ArrayList<>();
+		List<Component> labels = new ArrayList<>();
+		List<String> diagnostics = new ArrayList<>();
+		List<Integer> unreadCounts = new ArrayList<>();
+		int total = 0;
 		for (ExtendedConfig.Tab t : w.tabs()) {
 			if (t.id() == null) continue;
 			TabState st = SessionMirror.get().tab(t.id());
@@ -114,13 +126,48 @@ public final class ChatOpenRenderer {
 			Component label = Component.literal(name)
 					.append(unread > 0 ? Component.literal(" " + unread).withColor(0xFFFF55) : Component.empty())
 					.append(diagnostic != null ? Component.literal(" !").withColor(0xFF5555) : Component.empty());
-			int sw = font.width(label) + 6;
-			if (x + sw > strip[0] + strip[2] - lockSpace) break; // strip overflow: further tabs aren't shown (no strip scrolling yet)
-			boolean selected = t == shown;
+			tabs.add(t);
+			labels.add(label);
+			diagnostics.add(diagnostic);
+			unreadCounts.add(unread);
+			total += font.width(label) + 7;
+		}
+		int avail = strip[2] - 4 - lockSpace;
+		boolean overflow = total > avail;
+		int left = strip[0] + 2 + (overflow ? ARROW_W : 0);
+		int right = strip[0] + strip[2] - lockSpace - (overflow ? ARROW_W : 0);
+		int first = overflow ? Math.max(0, Math.min(TAB_SCROLL.getOrDefault(w.id(), 0), tabs.size() - 1)) : 0;
+		// Bring a newly selected tab into view (only when the selection changes, so the strip stays where it's scrolled).
+		int shownIndex = tabs.indexOf(shown);
+		String shownId = shown == null ? null : shown.id();
+		if (overflow && shownIndex >= 0 && !java.util.Objects.equals(LAST_SHOWN.get(w.id()), shownId)) {
+			if (shownIndex < first) first = shownIndex;
+			while (first < shownIndex && fits(font, labels, first, shownIndex, right - left) == false) first++;
+		}
+		LAST_SHOWN.put(w.id(), shownId);
+		TAB_SCROLL.put(w.id(), first);
+		List<TabSlot> slots = new ArrayList<>();
+		int x = left;
+		int last = first - 1;
+		for (int i = first; i < tabs.size(); i++) {
+			int sw = font.width(labels.get(i)) + 6;
+			if (x + sw > right) break;
+			boolean selected = tabs.get(i) == shown;
 			if (selected) g.fill(x, strip[1] + 1, x + sw, strip[1] + STRIP_H, 0x40FFFFFF);
-			g.drawString(font, label, x + 3, strip[1] + 2, selected ? 0xFFFFFFFF : 0xFFB0B0B0, true);
-			slots.add(new TabSlot(t.id(), x, strip[1], sw, STRIP_H, diagnostic != null, diagnostic));
+			g.drawString(font, labels.get(i), x + 3, strip[1] + 2, selected ? 0xFFFFFFFF : 0xFFB0B0B0, true);
+			slots.add(new TabSlot(tabs.get(i).id(), x, strip[1], sw, STRIP_H, diagnostics.get(i) != null, diagnostics.get(i)));
 			x += sw + 1;
+			last = i;
+		}
+		int[] leftArrow = null, rightArrow = null;
+		int leftColor = 0, rightColor = 0;
+		if (overflow) {
+			leftArrow = new int[]{strip[0] + 1, strip[1], ARROW_W, STRIP_H};
+			rightArrow = new int[]{right, strip[1], ARROW_W, STRIP_H};
+			leftColor = arrowColor(first > 0, unreadCounts, diagnostics, 0, first);
+			rightColor = arrowColor(last < tabs.size() - 1, unreadCounts, diagnostics, last + 1, tabs.size());
+			g.drawString(font, "<", leftArrow[0] + 2, strip[1] + 2, leftColor, true);
+			g.drawString(font, ">", rightArrow[0] + 2, strip[1] + 2, rightColor, true);
 		}
 
 		// Save-lock icon (P14): no-save is amber, divergence lock red.
@@ -175,7 +222,30 @@ public final class ChatOpenRenderer {
 		int[] grip = {r[0] + r[2] - GRIP, r[1] + r[3] - GRIP, GRIP, GRIP};
 		for (int i = 0; i < 3; i++) g.fill(grip[0] + GRIP - 2 - i * 2, grip[1] + GRIP - 2, grip[0] + GRIP - 1 - i * 2, grip[1] + GRIP - 1, 0xC0FFFFFF);
 		for (int i = 1; i < 3; i++) g.fill(grip[0] + GRIP - 2, grip[1] + GRIP - 2 - i * 2, grip[0] + GRIP - 1, grip[1] + GRIP - 1 - i * 2, 0xC0FFFFFF);
-		return new Layout(w.id(), r, strip, List.copyOf(slots), lock, body, scrollbar, grip, List.copyOf(lines), all.size(), visible, maxScroll);
+		return new Layout(w.id(), r, strip, List.copyOf(slots), lock, body, scrollbar, grip, List.copyOf(lines), all.size(), visible, maxScroll,
+				leftArrow, rightArrow, tabs.size(), first, leftColor, rightColor);
+	}
+
+	private static boolean fits(Font font, List<Component> labels, int from, int to, int width) {
+		int x = 0;
+		for (int i = from; i <= to; i++) x += font.width(labels.get(i)) + 7;
+		return x <= width;
+	}
+
+	/** Arrow colour: dim when nothing is scrolled out that way; red if a hidden tab is suspended, yellow if one has unread. */
+	private static int arrowColor(boolean active, List<Integer> unread, List<String> diagnostics, int from, int to) {
+		if (!active) return 0xFF505050;
+		boolean err = false, any = false;
+		for (int i = from; i < to; i++) {
+			err |= diagnostics.get(i) != null;
+			any |= unread.get(i) > 0;
+		}
+		return err ? 0xFFFF5555 : any ? 0xFFFFFF55 : 0xFFFFFFFF;
+	}
+
+	/** Scrolls a window's tab strip by whole tabs (overflow navigation). */
+	public static void scrollTabs(String windowId, int delta) {
+		TAB_SCROLL.put(windowId, Math.max(0, TAB_SCROLL.getOrDefault(windowId, 0) + delta));
 	}
 
 	private static @Nullable String diagnostic(ExtendedConfig.Tab t, @Nullable TabState st, RoutingConfig routing) {
@@ -193,6 +263,14 @@ public final class ChatOpenRenderer {
 	 * in the same frame (Phase 0 F-3).
 	 */
 	public static void renderTooltip(ChatScreen screen, GuiGraphics g, int mx, int my) {
+		String dragged = io.github.itznotneptune.cpextended.ui.ChatScreenInput.draggedTabLabel();
+		if (dragged != null) { // the tab being dragged follows the cursor, above everything
+			Font f = Minecraft.getInstance().font;
+			g.nextStratum();
+			g.fill(mx + 4, my - 2, mx + 10 + f.width(dragged), my + 10, 0xC0303030);
+			g.drawString(f, dragged, mx + 7, my, 0xFFFFFFFF, true);
+			return;
+		}
 		if (HitTester.protectedRegion(screen, mx, my) != null) return;
 		Layout top = topAt(mx, my);
 		if (top == null) return;

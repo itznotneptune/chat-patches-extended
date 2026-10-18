@@ -178,6 +178,36 @@ public final class ConfigManager {
 		return new EditOutcome(r, attemptSave("edit"));
 	}
 
+	/**
+	 * Applies several edits atomically (the config screen's Save): all apply to one copy, the orphan rule is checked on
+	 * the result, then a single save. If any edit doesn't apply, nothing changes.
+	 */
+	public synchronized EditOutcome editAll(List<ConfigEdit> edits) {
+		JsonObject copy = config.raw().deepCopy();
+		for (ConfigEdit e : edits) {
+			ConfigEdit.Result r = e.apply(copy, ConfigParser.interpret(copy).config());
+			if (r.outcome() != ConfigEdit.Outcome.APPLIED) return new EditOutcome(r, null);
+		}
+		ExtendedConfig next = ConfigParser.interpret(copy).config();
+		List<String> orphans = OrphanGuard.orphaningTabs(config.routing(), next.routing());
+		if (!orphans.isEmpty()) {
+			return new EditOutcome(ConfigEdit.Result.rejected("would orphan hidden messages in " + orphans
+					+ "; orphan restoration isn't available, so the change is refused (keep, disable or move the tab instead)"), null);
+		}
+		use(next);
+		pending.addAll(edits);
+		dirty = true;
+		return new EditOutcome(ConfigEdit.Result.OK, attemptSave("edit"));
+	}
+
+	/** A window or tab id not used in the configuration, with the given prefix. */
+	public String unusedId(String prefix) {
+		for (int i = 1; ; i++) {
+			String id = prefix + "-" + i;
+			if (config.window(id) == null && config.windowOfTab(id) == null) return id;
+		}
+	}
+
 	/** Client tick: runs a debounced save when due. */
 	public synchronized void tick() {
 		if (debounce > 0 && --debounce == 0) {

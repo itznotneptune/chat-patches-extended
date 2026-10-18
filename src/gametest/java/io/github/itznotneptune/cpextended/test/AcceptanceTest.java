@@ -92,6 +92,11 @@ public final class AcceptanceTest implements FabricClientGameTest {
 				case "hud" -> new Phase2Tests(this).hud();
 				case "interact" -> new Phase3Tests(this).interact();
 				case "unread" -> new Phase3Tests(this).unread();
+				case "gui" -> new Phase4Tests(this).gui();
+				case "drag" -> new Phase4Tests(this).drag();
+				case "keys" -> new Phase4Tests(this).keys();
+				case "scales" -> new Phase4Tests(this).scales();
+				case "extras" -> new ExtrasTests(this).extras();
 				case "conflict_bool", "conflict_int" -> conflict();
 				case "structural_off", "structural_base", "structural_tabs" -> structural();
 				default -> ev.data("error", "msg", "unknown mode " + mode);

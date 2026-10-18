@@ -6,6 +6,7 @@ import io.github.itznotneptune.cpextended.config.ConfigManager;
 import io.github.itznotneptune.cpextended.core.Capture;
 import io.github.itznotneptune.cpextended.core.Diagnostics;
 import io.github.itznotneptune.cpextended.dev.DevHooks;
+import io.github.itznotneptune.cpextended.gui.Keybinds;
 import io.github.itznotneptune.cpextended.render.WindowRenderer;
 import io.github.itznotneptune.cpextended.ui.ChatScreenInput;
 import io.github.itznotneptune.cpextended.ui.UnreadTracker;
@@ -15,7 +16,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Client entrypoint. Phase 3: capture, mirror, reconciler, config-driven routing, both rendering paths, chat-open interaction, unread. */
+/** Client entrypoint. Phase 4: adds the configuration GUI, keybind, optional Mod Menu entry and tab relocation. */
 public final class CpExtended implements ClientModInitializer {
 	public static final String MOD_ID = "cpextended";
 	public static final Logger LOGGER = LoggerFactory.getLogger("Chat Patches Extended");
@@ -37,7 +38,9 @@ public final class CpExtended implements ClientModInitializer {
 			Capture.onTick(client.gui.getChat());
 			UnreadTracker.tick();
 			ConfigManager.get().tick();
+			Keybinds.tick(client);
 		});
+		Keybinds.register(); // P15: unbound by default
 		UnreadTracker.register();
 		WindowRenderer.register(); // gameplay path (P10)
 		ChatScreenInput.register(); // chat-open path and P11 input

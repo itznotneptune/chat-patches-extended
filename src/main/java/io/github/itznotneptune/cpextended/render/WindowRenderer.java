@@ -4,6 +4,7 @@ package io.github.itznotneptune.cpextended.render;
 import io.github.itznotneptune.cpextended.config.ConfigManager;
 import io.github.itznotneptune.cpextended.config.ExtendedConfig;
 import io.github.itznotneptune.cpextended.core.MessageRecord;
+import io.github.itznotneptune.cpextended.core.Origin;
 import io.github.itznotneptune.cpextended.core.SessionMirror;
 import io.github.itznotneptune.cpextended.core.TabState;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
@@ -87,7 +88,8 @@ public final class WindowRenderer {
 		int drawn = 0;
 		for (int i = entries.size() - 1; i >= 0 && drawn < maxLines; i--) {
 			MessageRecord rec = entries.get(i);
-			double alpha = RenderSupport.fade(guiTicks - rec.message().addedTime());
+			// Restored lines start faded (§6.1, V-11): history isn't news, so it never flashes in the gameplay HUD.
+			double alpha = rec.origin() == Origin.RESTORED ? 0 : RenderSupport.fade(guiTicks - rec.message().addedTime());
 			if (alpha * look.textOpacity() * 255 <= 3) break; // older lines are only fainter (vanilla stops here too)
 			List<FormattedCharSequence> lines = RenderSupport.wrap(rec, font, innerW);
 			for (int j = lines.size() - 1; j >= 0 && drawn < maxLines; j--) {

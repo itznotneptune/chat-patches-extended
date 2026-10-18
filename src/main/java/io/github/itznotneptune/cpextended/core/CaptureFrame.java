@@ -14,6 +14,10 @@ final class CaptureFrame {
 	final int depth;
 	@Nullable GuiMessage message;
 	@Nullable RoutingDecision decision;
+	/** The text the filters matched (restored: the P2 reconstruction); set with the decision. */
+	@Nullable String matchText;
+	/** Why a restored message's structure wasn't recognized (P2), or null. */
+	@Nullable String reconstructionNote;
 	boolean delivered;
 	boolean failed;
 	int displayAdmissions;

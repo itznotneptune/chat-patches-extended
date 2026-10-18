@@ -25,9 +25,9 @@ EDGE = [
     # root with its own text
     {"text": "root text cpx#R-old5 ", "extra": [STAMP, "middle", ""]},
     # four siblings
-    {"text": "", "extra": [STAMP, "four siblings cpx#R-old7", "", "extra"]},
+    {"text": "", "extra": [STAMP, "four siblings cpx#R-old7", "", " tail"]},
     # translatable root (not empty plain text)
-    {"translate": "chat.type.announcement", "with": ["Server", "translatable root cpx#R-old8"], "extra": [STAMP, "x", ""]},
+    {"translate": "chat.type.announcement", "with": ["Server", "translatable root cpx#R-old8 "], "extra": [STAMP, "x", ""]},
 ]
 
 path = sys.argv[1]

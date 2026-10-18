@@ -182,13 +182,15 @@ D6 limitations: players are identified only by how their name appears in the tex
 
 The algorithm is structural only (S3, S4); it never uses text heuristics, so genuine text is never removed.
 
-1. **Boundary check:** if `adapter.isBoundaryLine(R)` → exempt (Q10); not routed; stays in the main chat.
+1. **Boundary check:** if `adapter.isBoundaryLine(R)` → exempt (Q10); not routed; stays in the main chat. *Implementation (Phase 6):* Chat Patches recognizes its boundary line by the insertion on sibling 1 of its **processed** structure (`Boundary.fromMessage` → `ChatUtil.getPart(c, 1)`, verified with `javap`), so the router checks both the original and the processed main-chat content; a live boundary line's original lacks that structure (found by V-31; a latent Milestone 1a defect).
 2. **Structure check:** `R` has empty contents and **exactly three siblings** (S3). Otherwise → **AMBIGUOUS** (e.g. logs from older Chat Patches versions). "Empty" is tested by **content** (empty text, no translation or other contents), not object identity, because the saved log is decoded by vanilla `ComponentSerialization.CODEC` (via Chat Patches' `UNSAFE_CODEC`). Whether the round-trip preserves this structure is V-27f.
 3. **Timestamp marker:** sibling 0's style insertion is a non-empty string of ASCII digits (S4). Otherwise → **AMBIGUOUS**. If valid, sibling 0 is removed.
 4. **Dupe slot:** sibling 2 is removed (Chat Patches' counter slot, S3).
 5. **Matching text** = `sibling1.getString()`, **unchanged**. **Username formatting is preserved as saved (Q16a);** no reversal is attempted. Q12 case rules apply.
 
 **AMBIGUOUS (Q16b):** the message routes to matching tabs using the best-effort text (`sibling1.getString()` if present, else `R.getString()`) and is **never hidden**.
+
+*Implementation (Phase 6):* `filter/RestoredText` applies steps 2–5 to the component exactly as it reached `addMessage` (never modifying it); the router uses its text for every tab with `restoreHistory` on (Q4) and records the matching text and, for AMBIGUOUS, the failed rule on the session-only `MessageRecord`. "Digit" means ASCII `0`–`9` only. Restored entries are never flagged unread (Q23) and start faded in the gameplay HUD (§6.1, V-11); they take part in tab display and search like live entries. Chat Patches 8.0.0 doesn't suppress their fade in its own chat (`ignoreRestoredMessages` only skips chat logging), so vanilla's chat shows restored lines for 10 s after joining while Extended's windows don't.
 
 **Limitations (documented, accepted by Q16a):**
 - With a non-default Chat Patches `nameFormat` (e.g. `[$]`), restored player messages contain the *formatted* name. Filters written against the live original (`<Steve>`) won't match them. With the default `<$>`, restored and live text are expected to be identical (V-27).

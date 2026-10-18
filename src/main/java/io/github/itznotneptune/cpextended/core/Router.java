@@ -3,6 +3,7 @@ package io.github.itznotneptune.cpextended.core;
 
 import io.github.itznotneptune.cpextended.compat.ChatPatchesAdapter;
 import io.github.itznotneptune.cpextended.filter.MatchText;
+import io.github.itznotneptune.cpextended.filter.RestoredText;
 import io.github.itznotneptune.cpextended.model.RoutingConfig;
 
 import java.util.ArrayList;
@@ -37,19 +38,35 @@ public final class Router {
 		RoutingConfig cfg = config; // one snapshot per message
 		if (cfg.tabs().isEmpty()) return RoutingDecision.NONE;
 
-		// Chat Patches' boundary line is exempt and always stays in the main chat (Q10).
-		if (Boolean.TRUE.equals(ChatPatchesAdapter.get().isBoundaryLine(f.original))) return RoutingDecision.EXEMPT;
+		// Chat Patches' boundary line is exempt and always stays in the main chat (Q10). Chat Patches recognizes it by the
+		// insertion on sibling 1 of its processed structure, so a live boundary line (whose original lacks that structure)
+		// is checked on the processed main-chat content too; a restored one carries it already.
+		ChatPatchesAdapter adapter = ChatPatchesAdapter.get();
+		if (Boolean.TRUE.equals(adapter.isBoundaryLine(f.original))
+				|| f.message != null && Boolean.TRUE.equals(adapter.isBoundaryLine(f.message.content()))) return RoutingDecision.EXEMPT;
 
-		// Restored history is routed with the P2 reconstruction (Phase 6). Until then it is mirrored but not routed.
-		if (f.origin == Origin.RESTORED) return RoutingDecision.NONE;
+		// Restored history (Q1, Q4, Q16): the P2 structural reconstruction gives the matching text; an unrecognized
+		// structure is AMBIGUOUS (routed best-effort, never hidden, Q16b). Only tabs with restoreHistory receive it.
+		boolean restored = f.origin == Origin.RESTORED;
 		boolean ambiguous = f.origin == Origin.UNKNOWN;
+		String matchText;
+		if (restored) {
+			RestoredText.Result rt = RestoredText.reconstruct(f.original);
+			matchText = rt.matchText();
+			ambiguous = rt.ambiguous();
+			f.reconstructionNote = rt.ambiguous() ? rt.reason() : null;
+		} else {
+			matchText = f.original.getString();
+		}
+		f.matchText = matchText;
 
 		// Exact matching text, no normalization (Q12); prepared once and shared by every tab (R-1).
-		MatchText text = MatchText.reusable(f.original.getString());
+		MatchText text = MatchText.reusable(matchText);
 		List<TabState> deliver = new ArrayList<>();
 		SessionMirror mirror = SessionMirror.get();
 		for (RoutingConfig.CompiledTab tab : cfg.tabs()) {
 			if (tab.suspended()) continue; // invalid filters are never executed (Q14, Q28)
+			if (restored && !tab.config().restoreHistory()) continue; // per-tab restored history (Q4)
 			TabState state = mirror.state(tab.id());
 			if (state.isRuntimeSuspended()) continue;
 			boolean match;

@@ -98,6 +98,8 @@ public final class AcceptanceTest implements FabricClientGameTest {
 				case "scales" -> new Phase4Tests(this).scales();
 				case "search" -> new Phase5Tests(this).search();
 				case "searchperf" -> new Phase5Tests(this).searchperf();
+				case "restore_seed" -> new Phase6Tests(this).restoreSeed();
+				case "restore6" -> new Phase6Tests(this).restore6();
 				case "extras" -> new ExtrasTests(this).extras();
 				case "conflict_bool", "conflict_int", "conflict_error" -> conflict();
 				case "structural_off", "structural_base", "structural_tabs" -> structural();
@@ -738,8 +740,11 @@ public final class AcceptanceTest implements FabricClientGameTest {
 			ev.result("V-03", expected != null && restoredCaptures == expected && restored.size() == mainChatRestored && liveTaggedRestored == 0 && bulkAsLive == 0,
 					"restoredCaptures", restoredCaptures, "chatLogCountAtSave", expected, "restoredRecordsAlive", restored.size(),
 					"restoredEntriesInMainChat", mainChatRestored, "liveTaggedRestored", liveTaggedRestored, "bulkRecordedAsLive", bulkAsLive);
-			ev.result("restored.notRoutedIn1a", restoredRouted == 0 && liveRouted, "restoredWithTabs", restoredRouted, "liveRouted", liveRouted,
-					"note", "restored history is routed with the P2 reconstruction in Phase 6");
+			long restoredTok = restored.stream().filter(r -> r.token() != null).count();
+			long restoredTokRouted = restored.stream().filter(r -> r.token() != null && r.tabs().contains("tok")).count();
+			ev.result("restored.routedPhase6", restoredTok > 0 && restoredTokRouted == restoredTok && liveRouted, "restoredWithToken", restoredTok,
+					"restoredWithTokenRoutedToTok", restoredTokRouted, "restoredWithTabs", restoredRouted, "liveRouted", liveRouted,
+					"note", "Phase 6: restored history routes with the P2 reconstruction into tabs with restoreHistory on (here every test tab); was 'restored.notRoutedIn1a' before Phase 6");
 
 			// V-25b relaunch: tab A is active again (suspension is session state only).
 			install(config(tab("A", "BOOM")));

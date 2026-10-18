@@ -43,7 +43,7 @@ public final class SessionMirror {
 
 	MessageRecord record(CaptureFrame f, GuiMessage message) {
 		RoutingDecision d = f.decision;
-		MessageRecord r = new MessageRecord(nextSeq++, message, f.original, f.origin, d != null && d.ambiguous());
+		MessageRecord r = new MessageRecord(nextSeq++, message, f.original, f.origin, d != null && d.ambiguous(), f.matchText, f.reconstructionNote);
 		if (d != null) {
 			for (TabState t : d.deliverTo()) {
 				// P4: flagged iff the tab isn't selected or its window is hidden; restored history is never flagged (Q23).

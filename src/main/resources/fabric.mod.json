@@ -16,7 +16,8 @@
     "minecraft": "=1.21.11",
     "chatpatches": "=8.0.0",
     "fabricloader": ">=${loader_version}",
-    "fabric-lifecycle-events-v1": ">=${lifecycle_version}"
+    "fabric-lifecycle-events-v1": ">=${lifecycle_version}",
+    "fabric-rendering-v1": ">=${rendering_version}"
   },
   "suggests": {
     "modmenu": "*"

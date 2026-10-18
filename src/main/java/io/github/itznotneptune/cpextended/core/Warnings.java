@@ -15,7 +15,7 @@ import java.util.Map;
  * are only counted, at debug level. The "next chat-screen opening" reminder P9 allows is not part of Milestone 1a.
  */
 public final class Warnings {
-	public enum Toast { NONE, DEGRADED, TAB_SUSPENDED, SEARCH_UNAVAILABLE, INTERNAL }
+	public enum Toast { NONE, DEGRADED, TAB_SUSPENDED, SEARCH_UNAVAILABLE, INTERNAL, CONFIG_NO_SAVE, CONFIG_DIVERGENCE, CONFIG_NOT_SAVED }
 
 	private static final Map<String, Integer> COUNTS = new LinkedHashMap<>();
 	private static int toastsShown;

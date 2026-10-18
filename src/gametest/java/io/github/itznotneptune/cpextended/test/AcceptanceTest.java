@@ -66,8 +66,8 @@ import java.util.regex.Pattern;
 public final class AcceptanceTest implements FabricClientGameTest {
 	private static final Pattern TOKEN = Pattern.compile("cpx#[A-Za-z0-9_-]+");
 
-	private ClientGameTestContext ctx;
-	private Evidence ev;
+	ClientGameTestContext ctx;
+	Evidence ev;
 	private String mode;
 
 	@Override
@@ -86,6 +86,10 @@ public final class AcceptanceTest implements FabricClientGameTest {
 				case "faults" -> faults();
 				case "matcher" -> matcher();
 				case "drift" -> drift();
+				case "config" -> new Phase2Tests(this).config();
+				case "config_corrupt" -> new Phase2Tests(this).configCorrupt();
+				case "config_newer" -> new Phase2Tests(this).configNewer();
+				case "hud" -> new Phase2Tests(this).hud();
 				case "conflict_bool", "conflict_int" -> conflict();
 				case "structural_off", "structural_base", "structural_tabs" -> structural();
 				default -> ev.data("error", "msg", "unknown mode " + mode);

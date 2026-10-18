@@ -1,0 +1,2 @@
+{"t":"mode","mode":"keys8","time":"2026-10-18T21:20:02.948040Z","diagnosticsEnabled":true,"devDisabled":false}
+{"t":"result","mode":"keys8","test":"V-38.categoryPosition","outcome":"PASS","observed":{"ourCategoryLabel":"Chat Patches Extended","categoryCount":9,"ourCategoryIndex":8,"ourRow":68,"lastCategories":["category#7","category#8","category#9"]},"note":"the Controls list scrolled to the category; screenshot p8-controls-category shows its label and key"}

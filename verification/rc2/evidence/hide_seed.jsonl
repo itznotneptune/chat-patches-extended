@@ -1,0 +1,2 @@
+{"t":"mode","mode":"hide_seed","time":"2026-10-18T21:16:48.037879Z","diagnosticsEnabled":true,"devDisabled":false}
+{"t":"result","mode":"hide_seed","test":"V-20f.disclosure.log","outcome":"PASS","disclosedPruned":30,"actualPruned":30}

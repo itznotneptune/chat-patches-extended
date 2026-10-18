@@ -357,7 +357,7 @@ final class Phase7aTests {
 		t.waitT(5);
 		Dump before = dump();
 		ConfigManager.OrphanCheck c1 = check(new ConfigEdit.DeleteTab("qx"));
-		ConfigManager.EditOutcome forced = confirm(new ConfigManager.OrphanCheck(true, null, 1, 0, List.of("qx")), new ConfigEdit.DeleteTab("qx"));
+		ConfigManager.EditOutcome forced = confirm(new ConfigManager.OrphanCheck(true, null, 1, 0, List.of("qx"), "\"qx\""), new ConfigEdit.DeleteTab("qx"));
 		Dump after = dump();
 		m.put("1.oneOrphan", row("refused", c1.refused(), "message", c1.refusal(), "confirmedAttemptRefused", !forced.applied(), "unchanged", before.same(after)));
 		boolean ok1 = c1.refused() && namesSafeAlternatives(c1.refusal()) && !forced.applied() && before.same(after);

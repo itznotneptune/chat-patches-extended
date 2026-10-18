@@ -1,0 +1,2 @@
+{"t":"mode","mode":"structural_hide","time":"2026-10-18T21:01:10.343177Z","diagnosticsEnabled":false,"devDisabled":false}
+{"t":"result","mode":"structural_hide","test":"structural.setup.structural_hide","outcome":"PASS","state":{"devDisabled":false,"diagnosticsEnabled":false,"accessorApplied":true,"routedToAllTab":11,"hiddenRecords":["structural message 3 cpx#SM-3","structural message 5 cpx#SM-5"],"chatLogCount":12},"mainChatEntries":9,"note":"main chat and chatlog.json are compared across structural_off/base/tabs by tools/compare_structural.py"}

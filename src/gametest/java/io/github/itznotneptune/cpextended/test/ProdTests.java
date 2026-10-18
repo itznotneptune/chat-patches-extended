@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Private validation (RC.1): a smoke test inside a production-style client (no development environment, the obfuscated
+ * Private validation (RC.1, repeated for RC.2): a smoke test inside a production-style client (no development environment, the obfuscated
  * game remapped to intermediary by Fabric Loader, the release jar and published dependencies in mods/). It uses no
  * development hook (they are inert in production by design): every step goes through real input or public state.
  * prod1: first launch. prod2: relaunch (restored history). prod3: relaunch with a damaged settings file (recovery).
@@ -94,12 +94,13 @@ final class ProdTests {
 		env.put("configCreatedAtLaunch", Files.exists(Phase2Tests.cfg()));
 		env.put("defaultConfigHasNoWindows", onClient(() -> mgr().config().windows().isEmpty()));
 		env.put("otherMods", FabricLoader.getInstance().getAllMods().stream().map(m -> m.getMetadata().getId()).filter(id -> List.of("chat_heads", "nochatreports", "modmenu").contains(id)).toList());
-		ev.result("RC1.environment", Boolean.FALSE.equals(env.get("developmentEnvironment")) && "1.0.0-rc.1".equals(env.get("extendedVersion"))
+		ev.result("RC1.environment", Boolean.FALSE.equals(env.get("developmentEnvironment")) && System.getProperty("cpx.expectedVersion", "?").equals(env.get("extendedVersion")) && String.valueOf(env.get("extendedJar")).endsWith("cpextended-" + env.get("extendedVersion") + ".jar")
 				&& Boolean.TRUE.equals(env.get("configCreatedAtLaunch")) && Boolean.TRUE.equals(env.get("defaultConfigHasNoWindows")), "observed", env);
 		try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
 			t.waitT(60);
 			ctx.runOnClient(c -> { ChatPatches.config.boundary = true; c.options.hideGui = false; });
 			createViaGui(sp);
+			backupGenerated();
 			routingAndHiding(sp);
 			unreadAndSelection(sp);
 			dragResizeRelocate(sp);
@@ -119,10 +120,10 @@ final class ProdTests {
 		t.waitT(5);
 		boolean keyOpens = screen() instanceof ConfigScreen;
 		if (!keyOpens) p4.open(() -> new ConfigScreen(null));
-		ctx.takeScreenshot("rc1-gui-settings-empty");
+		ctx.takeScreenshot("rc2-prod-gui-settings-empty");
 		p4.press("Add window");
 		windowId = screen() instanceof WindowScreen w ? onClient(w::windowId) : null;
-		ctx.takeScreenshot("rc1-gui-window-screen-new");
+		ctx.takeScreenshot("rc2-prod-gui-window-screen-new");
 		// tab 1: "Smoke", include cpx#SM, exclude "skip", hidden from the main chat
 		p4.press("Add tab");
 		boolean saved1 = false;
@@ -138,7 +139,7 @@ final class ProdTests {
 			var hideToggle = p4.widget("Hide from main chat");
 			if (hideToggle != null) p3.cursor(hideToggle.getX() + 10, hideToggle.getY() + 10);
 			t.waitT(30); // tooltip delay
-			ctx.takeScreenshot("rc1-gui-tab-editor-hide-tooltip");
+			ctx.takeScreenshot("rc2-prod-gui-tab-editor-hide-tooltip");
 			p4.press("Save");
 			saved1 = screen() instanceof WindowScreen;
 		}
@@ -167,6 +168,16 @@ final class ProdTests {
 				&& smokeCfg.include().size() == 1 && smokeCfg.exclude().size() == 1, "observed", m);
 	}
 
+	/** RC.2: the GUI saves above maintained a last-good backup (the previous valid version, not the current one). */
+	void backupGenerated() {
+		byte[] active = Phase2Tests.bytes(Phase2Tests.cfg()), bak = Phase2Tests.bytes(Phase2Tests.bak());
+		boolean valid = bak != null && io.github.itznotneptune.cpextended.config.ConfigParser.parse(bak).status() == io.github.itznotneptune.cpextended.config.ConfigParser.Status.OK;
+		boolean previous = bak != null && !java.util.Arrays.equals(active, bak);
+		var info = onClient(() -> mgr().storage().inspectBackup().state());
+		ev.result("RC2.prod.backupGenerated", valid && previous && info == io.github.itznotneptune.cpextended.config.ConfigStorage.BackupState.VALID,
+				"backupExists", bak != null, "backupValid", valid, "differsFromActive", previous, "lastBackupOutcome", onClient(() -> mgr().lastBackup()));
+	}
+
 	void routingAndHiding(TestSingleplayerContext sp) {
 		t.sys(sp, "smoke one cpx#SM-1");
 		t.sys(sp, "smoke two skip cpx#SM-2");
@@ -179,7 +190,7 @@ final class ProdTests {
 		ev.result("RC1.routingAndHiding", ok, "includeHidden", row("hidden", s1 != null && s1.hidden(), "inMainChat", inMain("cpx#SM-1")),
 				"excludedStaysVisible", row("inMainChat", inMain("cpx#SM-2"), "inSmoke", s2 != null && s2.tabIds().contains(smoke)),
 				"otherRoutedToEverything", o1 != null && o1.tabIds().contains(all));
-		ctx.takeScreenshot("rc1-hud-after-routing");
+		ctx.takeScreenshot("rc2-prod-hud-after-routing");
 	}
 
 	void unreadAndSelection(TestSingleplayerContext sp) {
@@ -191,7 +202,7 @@ final class ProdTests {
 		t.waitT(3);
 		String selected = onClient(() -> mgr().config().window(windowId).selectedTab());
 		int after = unread(all);
-		ctx.takeScreenshot("rc1-chat-open-window");
+		ctx.takeScreenshot("rc2-prod-chat-open-window");
 		p3.closeChat();
 		ev.result("RC1.unreadAndSelection", before >= 2 && all.equals(selected) && after == 0, "unreadBefore", before, "selectedAfterClick", selected, "unreadAfter", after);
 	}
@@ -245,7 +256,7 @@ final class ProdTests {
 		ctx.runOnClient(c -> { ChatPatches.config.regex = true; f.setValue(""); f.setValue("([bad"); });
 		t.waitT(3);
 		TabSearch.Indicator ind = onClient(() -> ChatOpenRenderer.indicatorOf(w));
-		ctx.takeScreenshot("rc1-invalid-regex");
+		ctx.takeScreenshot("rc2-prod-invalid-regex");
 		ctx.runOnClient(c -> { f.setValue(""); ChatPatches.config.regex = false; });
 		p3.closeChat();
 		boolean ok = plain.size() == 1 && plain.get(0).contains("cpx#OT-2") && ind == TabSearch.Indicator.INVALID;
@@ -279,19 +290,47 @@ final class ProdTests {
 		t.sys(sp, "only in smoke cpx#SM-9");
 		t.waitT(4);
 		p4.open(() -> new ConfigScreen(null));
-		ctx.takeScreenshot("rc1-gui-settings-populated");
+		List<String> listed = labels();
+		ctx.takeScreenshot("rc2-prod-settings-populated");
 		String w = windowOfTab(smoke);
 		p4.open(() -> new WindowScreen(new ConfigScreen(null), w));
-		ctx.takeScreenshot("rc1-gui-window-screen-populated");
+		String windowTitle = onClient(() -> Minecraft.getInstance().screen.getTitle().getString());
+		ctx.takeScreenshot("rc2-prod-window-screen-populated");
 		p4.press("Delete");
-		ctx.takeScreenshot("rc1-gui-delete-confirm");
+		String confirm = onClient(() -> Minecraft.getInstance().screen.getNarrationMessage().getString());
+		ctx.takeScreenshot("rc2-prod-delete-confirm");
 		p4.press("Yes");
-		ctx.takeScreenshot("rc1-gui-orphan-disclosure");
+		String disclosureText = onClient(() -> Minecraft.getInstance().screen.getNarrationMessage().getString());
+		ctx.takeScreenshot("rc2-prod-orphan-disclosure");
 		boolean disclosure = screen() instanceof net.minecraft.client.gui.screens.ConfirmScreen;
 		p4.press("No");
 		boolean kept = tabIdNamed("Smoke") != null;
 		ctx.setScreen(() -> null);
 		ev.data("usability_captures", "orphanDisclosureShown", disclosure, "tabKeptAfterNo", kept);
+		boolean names = disclosure && kept && disclosureText.contains("\"Smoke\"") && !disclosureText.contains(smoke) && confirm.contains("Smoke");
+		ev.result("RC2.prod.safetyDialogNames", names, "confirm", confirm, "disclosure", disclosureText, "tabKeptAfterNo", kept);
+		// prod1 dragged "Everything" into a window of its own, so each window lists one tab
+		boolean windowLabels = listed.stream().anyMatch(x -> x.matches("Window \\d+: Smoke")) && listed.stream().anyMatch(x -> x.matches("Window \\d+: Everything"))
+				&& listed.stream().noneMatch(x -> x.contains("tab(s)") || x.contains("window-")) && windowTitle.matches("Window \\d+: Smoke");
+		// the tab editor: case help and the Restored history label
+		p4.open(() -> new TabScreen(new WindowScreen(new ConfigScreen(null), w), smoke));
+		String caseTip = onClient(() -> { var b = Rc2Tests.widgetNow("aa"); return b == null ? null : Rc2Tests.tooltip(b); });
+		boolean restoreFits = onClient(() -> {
+			var b = Rc2Tests.widgetNow("Restored history");
+			return b != null && Minecraft.getInstance().font.width(b.getMessage()) <= b.getWidth() - 4;
+		});
+		ctx.takeScreenshot("rc2-prod-tab-editor");
+		ctx.setScreen(() -> null);
+		ev.result("RC2.prod.guiLabels", windowLabels && caseTip != null && caseTip.contains("Case-insensitive") && restoreFits, "windowList", listed, "windowTitle", windowTitle,
+				"caseTooltip", caseTip, "restoredHistoryLabelFits", restoreFits);
+	}
+
+	List<String> labels() {
+		return onClient(() -> {
+			List<String> out = new ArrayList<>();
+			for (var ch : Minecraft.getInstance().screen.children()) if (ch instanceof net.minecraft.client.gui.components.AbstractWidget aw) out.add(aw.getMessage().getString());
+			return out;
+		});
 	}
 
 	void reconnect() {
@@ -337,13 +376,21 @@ final class ProdTests {
 		m.put("stateAtLaunch", String.valueOf(onClient(() -> mgr().state())));
 		m.put("detail", onClient(() -> mgr().stateDetail()));
 		m.put("corruptCopy", String.valueOf(onClient(() -> mgr().corruptCopy())));
+		byte[] backup = Phase2Tests.bytes(Phase2Tests.bak());
 		p4.open(() -> new ConfigScreen(null));
 		boolean restoreOffered = p4.widget("Restore from backup") != null;
+		boolean restoreActive = onClient(() -> { var b = Rc2Tests.widgetNow("Restore from backup"); return b != null && b.active; });
+		String restoreTip = onClient(() -> { var b = Rc2Tests.widgetNow("Restore from backup"); return b == null ? null : Rc2Tests.tooltip(b); });
 		boolean replaceOffered = p4.widget("Replace file") != null;
-		ctx.takeScreenshot("rc1-recovery-screen");
+		ctx.runOnClient(c -> c.getToastManager().clear());
+		t.waitT(2);
+		ctx.takeScreenshot("rc2-prod-recovery-screen");
 		boolean restored = false;
-		if (restoreOffered && onClient(() -> mgr().storage().readBackup().bytes() != null)) {
+		String confirmText = null;
+		if (restoreActive) {
 			p4.press("Restore from backup");
+			confirmText = onClient(() -> Minecraft.getInstance().screen.getNarrationMessage().getString());
+			ctx.takeScreenshot("rc2-prod-restore-confirm");
 			p4.press("Yes");
 			restored = true;
 		} else {
@@ -351,6 +398,10 @@ final class ProdTests {
 			p4.press("Yes");
 		}
 		ctx.setScreen(() -> null);
+		m.put("restoreFromBackupActive", restoreActive);
+		m.put("restoreTooltip", restoreTip);
+		m.put("restoreConfirmation", confirmText);
+		m.put("activeEqualsBackupAfterRestore", restored && java.util.Arrays.equals(backup, Phase2Tests.bytes(Phase2Tests.cfg())));
 		m.put("restoreFromBackupOffered", restoreOffered);
 		m.put("replaceFileOffered", replaceOffered);
 		m.put("usedRestoreFromBackup", restored);
@@ -358,5 +409,7 @@ final class ProdTests {
 		m.put("fileValidAfter", io.github.itznotneptune.cpextended.config.ConfigParser.parse(Phase2Tests.bytes(Phase2Tests.cfg())).status().toString());
 		boolean ok = "NO_SAVE".equals(m.get("stateAtLaunch")) && (restoreOffered || replaceOffered) && "NORMAL".equals(m.get("stateAfter")) && "OK".equals(m.get("fileValidAfter"));
 		ev.result("RC1.configRecovery", ok, "observed", m);
+		ev.result("RC2.prod.recoveryFromBackup", ok && restored && Boolean.TRUE.equals(m.get("activeEqualsBackupAfterRestore")), "observed", m,
+				"note", "the backup was made by the game's own saves in prod1/prod2 (no file seeded); RC.1 had no backup and could only Replace file");
 	}
 }

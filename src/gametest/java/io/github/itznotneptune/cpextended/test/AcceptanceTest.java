@@ -118,6 +118,10 @@ public final class AcceptanceTest implements FabricClientGameTest {
 				case "misc8" -> new Phase8Tests(this).misc8();
 				case "keys8" -> new Phase8Tests(this).keys8();
 				case "mp" -> new Phase8Tests(this).mp();
+				case "rc2_backup" -> new Rc2Tests(this).backup();
+				case "rc2_gui" -> new Rc2Tests(this).gui();
+				case "rc2_kill_check" -> new Rc2Tests(this).killCheck();
+				case String m when m.startsWith("rc2_kill_") -> new Rc2Tests(this).kill(m.substring("rc2_kill_".length()));
 				case "prod1" -> new ProdTests(this).prod1();
 				case "prod2" -> new ProdTests(this).prod2();
 				case "prod3" -> new ProdTests(this).prod3();

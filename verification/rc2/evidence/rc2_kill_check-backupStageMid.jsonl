@@ -1,0 +1,2 @@
+{"t":"mode","mode":"rc2_kill_check","time":"2026-10-18T21:26:20.690303Z","diagnosticsEnabled":true,"devDisabled":false}
+{"t":"result","mode":"rc2_kill_check","test":"RC2.B11.kill.backupStageMid","outcome":"PASS","activeIs":"A","backupIs":"B0","expected":["A","B0"],"startupState":"NORMAL","runningOnBackup":false,"tempFilesAfterStartup":0,"recovery":{},"note":"Runtime.halt at that point of the save; this launch reads what was left on disk (A = previous active, B0 = previous backup, N = new version)"}

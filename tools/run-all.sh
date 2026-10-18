@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Acceptance run (Milestones 1a, 1b, Phases 2-8) from a clean run directory, then evidence collection.
-# Usage: tools/run-all.sh [output-dir]   (default verification/phase8; earlier evidence directories are left as recorded)
+# Acceptance run (Milestones 1a, 1b, Phases 2-8, RC.2) from a clean run directory, then evidence collection.
+# Usage: tools/run-all.sh [output-dir]   (default verification/rc2; earlier evidence directories are left as recorded)
 set -u
 root="$(cd "$(dirname "$0")/.." && pwd)"; cd "$root"
-run="build/run/clientGameTest"; logs="build/m1a-logs"; out="${1:-verification/phase8}"
+run="build/run/clientGameTest"; logs="build/m1a-logs"; out="${1:-verification/rc2}"
 export JAVA_HOME="$(/usr/libexec/java_home -v 25)"
 rm -rf build/run build/libs "$logs" "$out"; mkdir -p "$run" "$logs" "$out/evidence" "$out/logs"
 
@@ -97,15 +97,28 @@ print(json.dumps({"t": "result", "mode": "live-loader020", "test": "V-64.newerLo
                   "note": "the live mode re-run on Fabric Loader 0.20.0 (dev runtime only; metadata keeps >=0.19.5); no newer Fabric API exists for 1.21.11"}))
 PY
 
+echo "== rc2: last-good backup (P14 amendment) and GUI fixes"
+tools/run-mode.sh rc2_backup
+tools/run-mode.sh rc2_gui
+for pt in activeTempMid afterTemp backupStageMid afterBackupStaged afterActiveReplace afterBackupFinalize \
+          fallbackBackupMid afterFallbackBackup fallbackWriteMid q36_afterBackupStaged q36_afterActiveReplace q36_afterBackupFinalize; do
+  tools/run-mode.sh rc2_kill_$pt   # halts the JVM inside the save on purpose (non-zero exit expected)
+  cp "$logs/rc2_kill_$pt.log" "$logs/rc2_kill_$pt.halted.log" 2>/dev/null
+  tools/run-mode.sh rc2_kill_check
+  cp "$run/cpx-evidence/rc2_kill_check.jsonl" "$out/evidence/rc2_kill_check-$pt.jsonl"
+  cp "$logs/rc2_kill_check.log" "$logs/rc2_kill_check-$pt.log"
+done
+
 echo "== V-35"; tools/run-v35.sh | tee "$out/evidence/v35-summary.txt"
 
 echo "== collect"
 rm -f "$run/cpx-evidence/compat.jsonl"  # kept per combination by run-compat.sh
 cp "$run"/cpx-evidence/restore_seed-live.json "$run"/cpx-evidence/hide-seed.json "$out/evidence/" 2>/dev/null
-rm -f "$run/cpx-evidence/q36_kill_check.jsonl"  # kept per kill point above
+rm -f "$run/cpx-evidence/q36_kill_check.jsonl" "$run/cpx-evidence/rc2_kill_check.jsonl"  # kept per kill point above
+rm -f "$run"/cpx-evidence/rc2_kill_[a-z]*.jsonl; cp "$run"/cpx-evidence/rc2_kill_check-*.jsonl "$out/evidence/" 2>/dev/null
 cp "$run"/cpx-evidence/*.jsonl "$run"/cpx-evidence/*-mainchat.txt "$run"/cpx-evidence/*-chatlog.json "$out/evidence/" 2>/dev/null
 cp "$logs/compileClasspath.txt" "$out/evidence/"
-mkdir -p "$out/evidence/screenshots" && cp "$run"/screenshots/*p2-hud-*.png "$run"/screenshots/*p3-*.png "$run"/screenshots/*p4-*.png "$run"/screenshots/*p5-*.png "$run"/screenshots/*p6-*.png "$run"/screenshots/*p8-*.png "$out/evidence/screenshots/" 2>/dev/null
+mkdir -p "$out/evidence/screenshots" && cp "$run"/screenshots/*p2-hud-*.png "$run"/screenshots/*p3-*.png "$run"/screenshots/*p4-*.png "$run"/screenshots/*p5-*.png "$run"/screenshots/*p6-*.png "$run"/screenshots/*p8-*.png "$run"/screenshots/*rc2-*.png "$out/evidence/screenshots/" 2>/dev/null
 jar=$(ls build/libs/cpextended-*.jar | grep -v sources | head -1)
 unzip -p "$jar" fabric.mod.json > "$out/evidence/release-fabric.mod.json"
 unzip -l "$jar" | awk 'NR>3 {print $4}' | grep -v '^$' > "$out/evidence/release-jar-contents.txt"

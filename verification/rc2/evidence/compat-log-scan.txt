@@ -1,0 +1,5 @@
+compat-none: exception/error lines mentioning these mods: 0
+compat-chatheads: exception/error lines mentioning these mods: 0
+compat-ncr: exception/error lines mentioning these mods: 0
+compat-modmenu: exception/error lines mentioning these mods: 0
+compat-chatheads+ncr+modmenu: exception/error lines mentioning these mods: 0

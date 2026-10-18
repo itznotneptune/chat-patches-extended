@@ -1,0 +1,10 @@
+{"t":"mode","mode":"prod1","time":"2026-10-18T21:33:53.453732Z","diagnosticsEnabled":false,"devDisabled":false}
+{"t":"result","mode":"prod1","test":"RC1.environment","outcome":"PASS","observed":{"developmentEnvironment":false,"extendedVersion":"1.0.0-rc.2","extendedJar":"/Users/austin/Desktop/ChatPatches+/build/prodtest/base/game/mods/cpextended-1.0.0-rc.2.jar","javaVersion":"21.0.8","configCreatedAtLaunch":true,"defaultConfigHasNoWindows":true,"otherMods":[]}}
+{"t":"result","mode":"prod1","test":"RC1.createWindowsTabsFilters","outcome":"PASS","observed":{"keybindOpensSettings":true,"window":"window-1","tabs":{"smoke":"tab-1","all":"tab-2"},"smokeConfig":{"include":1,"exclude":1,"hide":true},"savedToFile":"SAVED"}}
+{"t":"result","mode":"prod1","test":"RC2.prod.backupGenerated","outcome":"PASS","backupExists":true,"backupValid":true,"differsFromActive":true,"lastBackupOutcome":"PROMOTED"}
+{"t":"result","mode":"prod1","test":"RC1.routingAndHiding","outcome":"PASS","includeHidden":{"hidden":true,"inMainChat":false},"excludedStaysVisible":{"inMainChat":true,"inSmoke":false},"otherRoutedToEverything":true}
+{"t":"result","mode":"prod1","test":"RC1.unreadAndSelection","outcome":"PASS","unreadBefore":3,"selectedAfterClick":"tab-2","unreadAfter":0}
+{"t":"result","mode":"prod1","test":"RC1.dragResizeRelocate","outcome":"PASS","observed":{"moved":{"from":[21,24],"to":[81,54]},"resized":{"from":[128,60],"to":[165,82]},"tabMovedToNewWindow":{"window":"window-2","historyKept":3},"savedToFile":"saved"}}
+{"t":"result","mode":"prod1","test":"RC1.searchAndInvalidRegex","outcome":"PASS","plainView":["[05:34:09] apple visible cpx#OT-2"],"invalidRegexIndicator":"INVALID"}
+{"t":"result","mode":"prod1","test":"RC1.hidingSwitch","outcome":"PASS","pressedOff":true,"visibleWhileOff":true,"pressedOn":true,"hiddenWhileOn":true,"earlierHiddenKeptInTab":true}
+{"t":"result","mode":"prod1","test":"RC1.disconnectReconnect","outcome":"PASS","smokeTabKeptEntries":3,"boundaryLineNewest":true,"routingAfterReconnect":true}

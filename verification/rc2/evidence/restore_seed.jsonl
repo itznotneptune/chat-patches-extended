@@ -1,0 +1,2 @@
+{"t":"mode","mode":"restore_seed","time":"2026-10-18T21:12:18.343456Z","diagnosticsEnabled":true,"devDisabled":false}
+{"t":"result","mode":"restore_seed","test":"restore_seed.fixturesSent","outcome":"PASS","captured":["dupeCopies","cpx#R-player","cpx#R-say","cpx#R-team","cpx#R-sys","cpx#R-plugin","cpx#R-legacy","cpx#R-trans","cpx#R-style","cpx#R-gen1","cpx#R-gen2","cpx#R-gen3","cpx#R-custom","cpx#R-dupe","boundary","cpx#R-after","playerName","chatLogMessageCount"],"missing":[]}

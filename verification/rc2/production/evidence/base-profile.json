@@ -1,0 +1,13 @@
+{
+ "profile": "/Users/austin/Desktop/ChatPatches+/build/prodtest/base",
+ "java": "/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin/java",
+ "classpathEntries": 80,
+ "mods": [
+  "chatpatches-8.0.0+1.21.11-fabric.jar",
+  "cpextended-1.0.0-rc.2-gametest.jar",
+  "cpextended-1.0.0-rc.2.jar",
+  "fabric-api-0.141.6+1.21.11.jar",
+  "fabric-client-gametest-api-v1-4.3.5+bfe9fcf43e.jar",
+  "yacl-3.8.2+1.21.11-fabric.jar"
+ ]
+}

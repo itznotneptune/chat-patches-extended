@@ -1,0 +1,9 @@
+{"t":"mode","mode":"unread","time":"2026-10-18T21:08:29.180841Z","diagnosticsEnabled":true,"devDisabled":false}
+{"t":"result","mode":"unread","test":"V-33","outcome":"PASS","counts":{"selectedVisible":0,"unselected":1,"disabledWindow":1,"selectedUnderF1":1,"selectedUnderChatHidden":1},"note":"counts are per tab and cumulative: F1 cleared on release, then one more flagged under Chat Visibility Hidden"}
+{"t":"result","mode":"unread","test":"V-33d","outcome":"PASS","afterF1Released":0,"afterChatShown":0,"disabledWindowReenabled":"cleared"}
+{"t":"result","mode":"unread","test":"V-33b","outcome":"PASS","before":1,"after":0}
+{"t":"result","mode":"unread","test":"V-33e","outcome":"PASS","flaggedWithChatClosedUnderF1":1,"clearedOnOpeningChatUnderF1":0,"drawnAndInteractive":true,"flaggedAfterClosingAgain":1}
+{"t":"result","mode":"unread","test":"V-33f","outcome":"PASS","unreadAfterXX":1,"retainedEntries":1,"unreadAfterReadThenX":1,"note":"Chat Patches condenses the copy; the earlier entry leaves with its flag by liveness (P4.4)"}
+{"t":"result","mode":"unread","test":"V-33c","outcome":"PASS","note":"condensed duplicates and deletions per Q23 (see V-33f, V-33g); restored history is never flagged by the delivery rule (restored routing is Phase 6)"}
+{"t":"result","mode":"unread","test":"V-33g","outcome":"PASS","beforeDelete":2,"afterDelete":1,"afterClear":0,"countEqualsRetainedFlaggedEntries":true}
+{"t":"result","mode":"unread","test":"P3.unreadNotPersisted","outcome":"PASS","note":"no delivered message text, unread or history data in cpextended.json (tab filter patterns are configuration)"}

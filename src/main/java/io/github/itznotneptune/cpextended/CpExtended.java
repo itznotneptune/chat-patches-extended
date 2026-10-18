@@ -7,13 +7,15 @@ import io.github.itznotneptune.cpextended.core.Capture;
 import io.github.itznotneptune.cpextended.core.Diagnostics;
 import io.github.itznotneptune.cpextended.dev.DevHooks;
 import io.github.itznotneptune.cpextended.render.WindowRenderer;
+import io.github.itznotneptune.cpextended.ui.ChatScreenInput;
+import io.github.itznotneptune.cpextended.ui.UnreadTracker;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Client entrypoint. Phase 2: capture, adapter, mirror, reconciler, routing from config/cpextended.json, read-only HUD windows. */
+/** Client entrypoint. Phase 3: capture, mirror, reconciler, config-driven routing, both rendering paths, chat-open interaction, unread. */
 public final class CpExtended implements ClientModInitializer {
 	public static final String MOD_ID = "cpextended";
 	public static final Logger LOGGER = LoggerFactory.getLogger("Chat Patches Extended");
@@ -33,8 +35,11 @@ public final class CpExtended implements ClientModInitializer {
 		// Liveness pruning also runs on a tick check, never inside screen input handlers (architecture §4.7).
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			Capture.onTick(client.gui.getChat());
+			UnreadTracker.tick();
 			ConfigManager.get().tick();
 		});
-		WindowRenderer.register();
+		UnreadTracker.register();
+		WindowRenderer.register(); // gameplay path (P10)
+		ChatScreenInput.register(); // chat-open path and P11 input
 	}
 }

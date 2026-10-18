@@ -7,6 +7,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class TestCounters {
 	/** V-05: display-queue calls made outside any addMessage frame. */
 	public static final AtomicInteger FRAMELESS_DISPLAY = new AtomicInteger();
+	/** V-57: calls into vanilla ChatScreen.mouseClicked / mouseScrolled. */
+	public static final AtomicInteger VANILLA_CLICKS = new AtomicInteger();
+	public static final AtomicInteger VANILLA_SCROLLS = new AtomicInteger();
 
 	/** V-55: per-frame accounting of one window's draws against the expected visibility. */
 	public static volatile java.util.function.BooleanSupplier expectedVisible;

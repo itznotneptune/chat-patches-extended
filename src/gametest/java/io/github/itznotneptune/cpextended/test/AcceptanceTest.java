@@ -90,6 +90,8 @@ public final class AcceptanceTest implements FabricClientGameTest {
 				case "config_corrupt" -> new Phase2Tests(this).configCorrupt();
 				case "config_newer" -> new Phase2Tests(this).configNewer();
 				case "hud" -> new Phase2Tests(this).hud();
+				case "interact" -> new Phase3Tests(this).interact();
+				case "unread" -> new Phase3Tests(this).unread();
 				case "conflict_bool", "conflict_int" -> conflict();
 				case "structural_off", "structural_base", "structural_tabs" -> structural();
 				default -> ev.data("error", "msg", "unknown mode " + mode);
@@ -923,6 +925,10 @@ public final class AcceptanceTest implements FabricClientGameTest {
 			}
 			@Override public boolean isRestoring() { return real.isRestoring(); }
 			@Override public boolean searchEnabled() { return real.searchEnabled(); }
+			@Override public boolean contextMenuOpen(ChatScreen screen) { return real.contextMenuOpen(screen); }
+			@Override public boolean overContextMenu(ChatScreen screen, double x, double y) { return real.overContextMenu(screen, x, y); }
+			@Override public boolean overSettingsMenu(ChatScreen screen, double x, double y) { return real.overSettingsMenu(screen, x, y); }
+			@Override public int mainChatLineAt(double x, double y) { return real.mainChatLineAt(x, y); }
 		};
 	}
 

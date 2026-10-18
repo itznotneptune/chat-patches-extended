@@ -46,7 +46,8 @@ public final class SessionMirror {
 		MessageRecord r = new MessageRecord(nextSeq++, message, f.original, f.origin, d != null && d.ambiguous());
 		if (d != null) {
 			for (TabState t : d.deliverTo()) {
-				t.add(r);
+				// P4: flagged iff the tab isn't selected or its window is hidden; restored history is never flagged (Q23).
+				t.add(r, f.origin != Origin.RESTORED && !Unread.readOnDelivery(t.id()));
 				r.addTab(t.id());
 			}
 		}

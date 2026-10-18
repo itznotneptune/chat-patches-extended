@@ -9,6 +9,7 @@
     "NestedAddMixin",
     "AdmissionFaultMixin",
     "FrameProbeMixin",
+    "ChatScreenCounterMixin",
     "ConflictBooleanMixin",
     "ConflictIntMixin"
   ],

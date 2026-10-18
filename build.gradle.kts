@@ -15,7 +15,7 @@ val cpVariant = (project.findProperty("cpVariant") as String?) ?: "real"
 
 // Fabric API modules the mod actually uses (P15, V-15). Each is declared in fabric.mod.json with a lower bound at the
 // version tested here. Nothing else from Fabric API is on the main compile classpath.
-val fabricModules = listOf("fabric-lifecycle-events-v1", "fabric-rendering-v1")
+val fabricModules = listOf("fabric-lifecycle-events-v1", "fabric-rendering-v1", "fabric-screen-api-v1")
 
 repositories {
     mavenCentral()
@@ -90,6 +90,7 @@ tasks.processResources {
         "loader_version" to loaderVersion,
         "lifecycle_version" to fabricApi.moduleVersion("fabric-lifecycle-events-v1", fabricApiVersion),
         "rendering_version" to fabricApi.moduleVersion("fabric-rendering-v1", fabricApiVersion),
+        "screen_version" to fabricApi.moduleVersion("fabric-screen-api-v1", fabricApiVersion),
     )
     inputs.properties(props)
     filesMatching("fabric.mod.json") { expand(props) }

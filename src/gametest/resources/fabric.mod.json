@@ -5,7 +5,8 @@
   "name": "Chat Patches Extended acceptance tests",
   "environment": "client",
   "entrypoints": {
-    "fabric-client-gametest": ["io.github.itznotneptune.cpextended.test.AcceptanceTest"]
+    "fabric-client-gametest": ["io.github.itznotneptune.cpextended.test.AcceptanceTest"],
+    "client": ["io.github.itznotneptune.cpextended.test.ForeignListener"]
   },
   "mixins": ["cpextended_test.mixins.json"],
   "depends": { "cpextended": "*", "chatpatches": "*" }

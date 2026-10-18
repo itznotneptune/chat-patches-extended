@@ -29,7 +29,7 @@ public final class ChatPatchesAdapter {
 
 	public enum Op {
 		RESTORED_TAG(FailureClass.S), VANILLA_CLEARING(FailureClass.S), CHAT_MAX_MESSAGES(FailureClass.S), BOUNDARY(FailureClass.S),
-		CONDENSE_WINDOW(FailureClass.L), SAFE_POINT(FailureClass.L),
+		CONDENSE_WINDOW(FailureClass.L), SAFE_POINT(FailureClass.L), CHAT_PATCHES_UI(FailureClass.L), MAIN_CHAT_LINE(FailureClass.L),
 		SEARCH_VISIBILITY(FailureClass.Q), SEARCH_QUERY(FailureClass.Q);
 
 		public final FailureClass failureClass;
@@ -143,6 +143,83 @@ public final class ChatPatchesAdapter {
 		} catch (RuntimeException | LinkageError e) {
 			failL(Op.SAFE_POINT, e);
 			return false;
+		}
+	}
+
+	/**
+	 * Whether Chat Patches' context menu is open on {@code screen}. Unreadable means "open" (conservative, P11): every
+	 * click then passes to Chat Patches.
+	 */
+	public boolean isContextMenuOpen(ChatScreen screen) {
+		try {
+			return backend.contextMenuOpen(screen);
+		} catch (RuntimeException | LinkageError e) {
+			failL(Op.CHAT_PATCHES_UI, e);
+			return true;
+		}
+	}
+
+	/** Whether the point is over Chat Patches' context menu or settings panel. Unreadable means "yes" (Class L). */
+	public boolean isOverChatPatchesUi(ChatScreen screen, double x, double y) {
+		try {
+			ChatPatchesBackend b = backend;
+			return b.overContextMenu(screen, x, y) || b.overSettingsMenu(screen, x, y);
+		} catch (RuntimeException | LinkageError e) {
+			failL(Op.CHAT_PATCHES_UI, e);
+			return true;
+		}
+	}
+
+	/**
+	 * Whether a visible main-chat message line is under the point (Q18). Unreadable means the whole main-chat area is
+	 * protected (Class L): the caller passes {@code inMainChatArea} for that fallback.
+	 */
+	public boolean isOverMainChatLine(double x, double y, boolean inMainChatArea) {
+		try {
+			return backend.mainChatLineAt(x, y) >= 0;
+		} catch (RuntimeException | LinkageError e) {
+			failL(Op.MAIN_CHAT_LINE, e);
+			return inMainChatArea;
+		}
+	}
+
+	/** Chat Patches' search button (fixed geometry in 8.0.0), when search is enabled; null otherwise. */
+	public int @Nullable [] searchButtonRect(int screenHeight) {
+		try {
+			return backend.searchEnabled() ? new int[]{2, screenHeight - 35, 16, 16} : null;
+		} catch (RuntimeException | LinkageError e) {
+			failL(Op.CHAT_PATCHES_UI, e);
+			return new int[]{2, screenHeight - 35, 16, 16};
+		}
+	}
+
+	/**
+	 * The area Chat Patches' search field occupies when it may be shown: its real bounds when readable, otherwise the
+	 * Q29b conservative reservation while {@code config.search} is on; null when the bar is known to be hidden.
+	 */
+	public int @Nullable [] searchFieldRect(ChatScreen screen) {
+		Boolean shown = isSearchBarShown();
+		if (Boolean.FALSE.equals(shown)) return null;
+		int[] fallback = {22, screen.height - 31, (int) (screen.width * 0.25), 12};
+		Field f = searchField;
+		if (f == null || shown == null) return fallback;
+		try {
+			EditBox box = (EditBox) f.get(screen);
+			return box == null ? fallback : new int[]{box.getX(), box.getY(), box.getWidth(), box.getHeight()};
+		} catch (ReflectiveOperationException | RuntimeException e) {
+			failQ(Op.SEARCH_QUERY, "read error", e);
+			return fallback;
+		}
+	}
+
+	/** The search field widget itself (to tell it apart from the vanilla input), or null. */
+	public @Nullable EditBox searchFieldWidget(ChatScreen screen) {
+		Field f = searchField;
+		if (f == null) return null;
+		try {
+			return (EditBox) f.get(screen);
+		} catch (ReflectiveOperationException | RuntimeException e) {
+			return null;
 		}
 	}
 

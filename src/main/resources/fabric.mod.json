@@ -17,7 +17,8 @@
     "chatpatches": "=8.0.0",
     "fabricloader": ">=${loader_version}",
     "fabric-lifecycle-events-v1": ">=${lifecycle_version}",
-    "fabric-rendering-v1": ">=${rendering_version}"
+    "fabric-rendering-v1": ">=${rendering_version}",
+    "fabric-screen-api-v1": ">=${screen_version}"
   },
   "suggests": {
     "modmenu": "*"

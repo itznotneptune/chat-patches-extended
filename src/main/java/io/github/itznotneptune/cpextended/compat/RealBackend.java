@@ -2,10 +2,14 @@
 package io.github.itznotneptune.cpextended.compat;
 
 import net.minecraft.client.GuiMessageTag;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.network.chat.Component;
 import obro1961.chatpatches.Boundary;
 import obro1961.chatpatches.ChatLog;
 import obro1961.chatpatches.ChatPatches;
+import obro1961.chatpatches.accessor.ChatComponentAccess;
+import obro1961.chatpatches.accessor.ChatScreenAccess;
 
 /** Direct reads of Chat Patches 8.0.0 public members (architecture §8.2). Linkage errors surface to the adapter. */
 final class RealBackend implements ChatPatchesBackend {
@@ -19,4 +23,15 @@ final class RealBackend implements ChatPatchesBackend {
 	@Override public boolean isLoading() { return ChatLog.isLoading(); }
 	@Override public boolean isRestoring() { return ChatLog.isRestoring(); }
 	@Override public boolean searchEnabled() { return ChatPatches.config.search; }
+
+	@Override public boolean contextMenuOpen(ChatScreen screen) {
+		var menu = ((ChatScreenAccess) screen).getContextMenu();
+		return menu != null && menu.isFunctional();
+	}
+	@Override public boolean overContextMenu(ChatScreen screen, double x, double y) {
+		var menu = ((ChatScreenAccess) screen).getContextMenu();
+		return menu != null && menu.isFunctional() && menu.isMouseOver(x, y);
+	}
+	@Override public boolean overSettingsMenu(ChatScreen screen, double x, double y) { return ((ChatScreenAccess) screen).isMouseOverSettingsMenu(x, y); }
+	@Override public int mainChatLineAt(double x, double y) { return ((ChatComponentAccess) Minecraft.getInstance().gui.getChat()).getEoEIndex(x, y); }
 }

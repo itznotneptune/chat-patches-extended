@@ -6,7 +6,10 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "ChatComponentAccessor",
-    "ChatComponentMixin"
+    "ChatComponentMixin",
+    "ChatScreenAccessor",
+    "CommandSuggestionsAccessor",
+    "SuggestionsListAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

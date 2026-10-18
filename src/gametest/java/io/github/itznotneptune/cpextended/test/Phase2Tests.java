@@ -793,7 +793,8 @@ final class Phase2Tests {
 			TestCounters.trackedWindow = "h-main";
 			TestCounters.expectedVisible = () -> {
 				Minecraft c = Minecraft.getInstance();
-				return c.level != null && !c.options.hideGui && c.options.chatVisibility().get() != ChatVisiblity.HIDDEN && !(c.screen instanceof ChatScreen);
+				// Phase 3 rule: the chat-open path draws while chat is open, even under F1 (Q26); the HUD path otherwise.
+				return c.level != null && c.options.chatVisibility().get() != ChatVisiblity.HIDDEN && (c.screen instanceof ChatScreen || !c.options.hideGui);
 			};
 			t.waitT(1);
 			TestCounters.ANOMALY_SAMPLES.clear();
@@ -810,7 +811,7 @@ final class Phase2Tests {
 			int frames = TestCounters.FRAMES.get() - f0, anomalies = TestCounters.ANOMALIES.get() - a0;
 			ev.result("V-55.phase2", frames > 200 && anomalies == 0 && WindowRenderer.duplicateDraws() == 0, "framesChecked", frames, "anomalies", anomalies,
 					"samples", TestCounters.ANOMALY_SAMPLES, "duplicateDraws", WindowRenderer.duplicateDraws(),
-					"note", "Phase 2 has the gameplay path only (inactive while chat is open, P10); the gameplay/chat-open path split is re-tested in Phase 3");
+					"note", "since Phase 3 both paths exist; exactly one draws each window per frame (chat-open path while chat is open, also under F1)");
 
 			// Clamping without file writes (V-12 portion), wrap cache
 			int[] clamp = WindowRenderer.lastRect("h-clamp");
@@ -843,7 +844,7 @@ final class Phase2Tests {
 			ctx.setScreen(() -> new ChatScreen("", false));
 			t.waitT(6);
 			BufferedImage open = ImageIO.read(ctx.takeScreenshot("p2-hud-chatopen").toFile());
-			long chatOpenFrames = WindowRenderer.framesWithDraws();
+			long chatOpenFrames = WindowRenderer.hudPathDraws();
 			int[] input = {2, screen[1] - 14, screen[0] - 4, 12}; // the chat input box's fill (vanilla layout)
 			int pureInInput = countPure(open, scale, intersect(over, input));
 			// The routed lines are magenta in the main chat too, so check the top-right window's area, which the main chat never reaches.
@@ -852,8 +853,9 @@ final class Phase2Tests {
 			int pureMainWindowGameplay = countPure(gameplay, scale, beyondChat);
 			int pureMainWindowChatOpen = countPure(open, scale, beyondChat);
 			ctx.setScreen(() -> null);
-			ev.result("P2.notDrawnWhileChatOpen", chatOpenFrames == 0 && pureInInput == 0 && pureMainWindowGameplay > 0 && pureMainWindowChatOpen == 0,
-					"framesDrawnWithChatOpen", chatOpenFrames, "pureInInputBox", pureInInput,
+			// Since Phase 3 the chat-open path draws the windows beneath the chat screen's UI; the HUD path must stay inactive.
+			ev.result("P2.hudPathInactiveWhileChatOpen", chatOpenFrames == 0 && pureInInput == 0 && pureMainWindowGameplay > 0,
+					"hudPathDrawsWithChatOpen", chatOpenFrames, "pureInInputBox", pureInInput,
 					"windowAreaPureMagenta", row("area", Arrays.toString(beyondChat), "gameplay", pureMainWindowGameplay, "chatOpen", pureMainWindowChatOpen), "screenshot", "p2-hud-chatopen",
 					"note", "an earlier Phase 2 build that kept drawing via the HUD path while chat was open put window text above the main-chat lines;"
 							+ " removed in favour of P10's rule. Full V-53 (chat-open layering) is Phase 3");

@@ -5,4 +5,9 @@ package io.github.itznotneptune.cpextended.filter;
 @FunctionalInterface
 public interface Matcher {
 	boolean matches(String text);
+
+	/** Same result as {@link #matches(String)}; lets implementations reuse per-message preparation. */
+	default boolean matches(MatchText text) {
+		return matches(text.text());
+	}
 }

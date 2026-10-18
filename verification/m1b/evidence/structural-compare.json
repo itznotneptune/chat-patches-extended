@@ -1,0 +1,24 @@
+{
+  "test": "structural.mainChatAndChatlogUnchanged",
+  "outcome": "PASS",
+  "details": {
+    "structural_base": {
+      "mainChatEntries": 11,
+      "mainChatIdentical": true,
+      "firstMainDiff": null,
+      "chatlogIdentical": true,
+      "chatlogBytes": 3499
+    },
+    "structural_tabs": {
+      "mainChatEntries": 11,
+      "mainChatIdentical": true,
+      "firstMainDiff": null,
+      "chatlogIdentical": true,
+      "chatlogBytes": 3499
+    },
+    "structural_off": {
+      "mainChatEntries": 11,
+      "chatlogBytes": 3499
+    }
+  }
+}

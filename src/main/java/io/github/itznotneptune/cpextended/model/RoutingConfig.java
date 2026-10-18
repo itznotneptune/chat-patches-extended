@@ -4,6 +4,7 @@ package io.github.itznotneptune.cpextended.model;
 import io.github.itznotneptune.cpextended.dev.DevHooks;
 import io.github.itznotneptune.cpextended.filter.FilterSpec;
 import io.github.itznotneptune.cpextended.filter.LiteralMatcher;
+import io.github.itznotneptune.cpextended.filter.MatchText;
 import io.github.itznotneptune.cpextended.filter.Matcher;
 import io.github.itznotneptune.cpextended.filter.PatternValidator;
 
@@ -27,7 +28,7 @@ public final class RoutingConfig {
 		public boolean suspended() { return !errors.isEmpty(); }
 
 		/** Any include matches (or none and matchAll), and no exclude matches. May throw; see the router's guard. */
-		public boolean matches(String text) {
+		public boolean matches(MatchText text) {
 			boolean included;
 			if (include.isEmpty()) included = config.matchAll();
 			else {

@@ -33,4 +33,14 @@ public final class TabState {
 	void add(MessageRecord r) { entries.add(r); }
 	void remove(MessageRecord r) { entries.remove(r); }
 	void clear() { entries.clear(); }
+
+	boolean contains(MessageRecord r) { return entries.contains(r); }
+
+	/** Reorders the entries to follow {@code order} (the mirror's order); entries not in {@code order} are dropped. */
+	void reorder(Iterable<MessageRecord> order) {
+		LinkedHashSet<MessageRecord> next = new LinkedHashSet<>();
+		for (MessageRecord r : order) if (entries.contains(r)) next.add(r);
+		entries.clear();
+		entries.addAll(next);
+	}
 }

@@ -70,7 +70,7 @@ public final class Capture {
 		}
 	}
 
-	/** M1 exit: delivers if M3 never ran, closes the frame, then checks liveness. */
+	/** M1 exit: delivers if M3 never ran and closes the frame. Liveness is the reconciler's job, at the next safe point. */
 	public static void exit(ChatComponent chat) {
 		ArrayDeque<CaptureFrame> frames = STACK.get();
 		CaptureFrame f = frames.poll();
@@ -82,7 +82,6 @@ public final class Capture {
 						"Another mod suppressed only one of the two main-chat admissions (outside Extended's control; architecture §8.4)", null);
 				Diagnostics.event("partial_admission", "display", f.displayAdmissions, "messages", f.messageAdmissions);
 			}
-			if (frames.isEmpty()) SessionMirror.get().prune(allMessages(chat));
 		} catch (RuntimeException e) {
 			internalError("exit", e);
 		}
@@ -101,7 +100,6 @@ public final class Capture {
 				Warnings.report("clear:postcondition", Warnings.Toast.NONE,
 						"Main-chat clear did not match the expected rule (cleared=" + cleared + ", empty=" + observedEmpty + ")", null);
 			}
-			SessionMirror.get().prune(all);
 			Diagnostics.event("clear", "history", history, "vanillaClearing", vanillaClearing, "cleared", cleared, "observedEmpty", observedEmpty,
 					"records", SessionMirror.get().size());
 		} catch (RuntimeException e) {
@@ -109,14 +107,40 @@ public final class Capture {
 		}
 	}
 
-	/** Tick check (§4.7): catches removals made outside {@code addMessage}, such as Chat Patches' delete. */
+	/** End of a client tick: a safe point (never inside addMessage or screen input handling), so reconcile there. */
 	public static void onTick(ChatComponent chat) {
-		if (!STACK.get().isEmpty()) return;
 		try {
-			SessionMirror.get().pruneIfChanged(allMessages(chat));
+			Reconciler.run(chat);
 		} catch (RuntimeException e) {
-			internalError("tick", e);
+			internalError("reconcile", e);
 		}
+	}
+
+	/**
+	 * Removes and returns every frame still open on this thread. Called by the reconciler at a safe point, where any
+	 * open frame was abandoned (its {@code addMessage} call is no longer running).
+	 */
+	static List<CaptureFrame> drainFrames() {
+		ArrayDeque<CaptureFrame> frames = STACK.get();
+		if (frames.isEmpty()) return List.of();
+		List<CaptureFrame> out = new java.util.ArrayList<>(frames);
+		frames.clear();
+		return out;
+	}
+
+	/**
+	 * Development builds only (verification of abandoned-frame recovery): opens a frame for {@code message}, runs the
+	 * first {@code admissions} admission wrappers (0 = none, 1 = M2, 2 = M2 and M3), inserts the message into the main
+	 * chat as vanilla would, and never closes the frame.
+	 */
+	public static GuiMessage devAbandonFrame(ChatComponent chat, Component message, int admissions) {
+		io.github.itznotneptune.cpextended.dev.DevHooks.requireDev();
+		enter(chat, message, null);
+		GuiMessage g = new GuiMessage(Minecraft.getInstance().gui.getGuiTicks(), message, null, null);
+		if (admissions >= 1) admitDisplay(g);
+		if (admissions >= 2) admitMessages(g);
+		allMessages(chat).add(0, g);
+		return g;
 	}
 
 	/** Depth of the current frame stack (0 outside {@code addMessage}). */

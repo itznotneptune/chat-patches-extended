@@ -2,6 +2,7 @@
 package io.github.itznotneptune.cpextended.core;
 
 import io.github.itznotneptune.cpextended.compat.ChatPatchesAdapter;
+import io.github.itznotneptune.cpextended.filter.MatchText;
 import io.github.itznotneptune.cpextended.model.RoutingConfig;
 
 import java.util.ArrayList;
@@ -43,7 +44,8 @@ public final class Router {
 		if (f.origin == Origin.RESTORED) return RoutingDecision.NONE;
 		boolean ambiguous = f.origin == Origin.UNKNOWN;
 
-		String text = f.original.getString(); // exact matching text, no normalization (Q12)
+		// Exact matching text, no normalization (Q12); prepared once and shared by every tab (R-1).
+		MatchText text = MatchText.reusable(f.original.getString());
 		List<TabState> deliver = new ArrayList<>();
 		SessionMirror mirror = SessionMirror.get();
 		for (RoutingConfig.CompiledTab tab : cfg.tabs()) {

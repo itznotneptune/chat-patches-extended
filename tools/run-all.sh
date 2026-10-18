@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Milestone 1a acceptance run from a clean run directory, then evidence collection into verification/m1a/.
+# Acceptance run (Milestones 1a + 1b) from a clean run directory, then evidence collection.
+# Usage: tools/run-all.sh [output-dir]   (default verification/m1b; the 1a evidence in verification/m1a is left as recorded)
 set -u
 root="$(cd "$(dirname "$0")/.." && pwd)"; cd "$root"
-run="build/run/clientGameTest"; logs="build/m1a-logs"; out="verification/m1a"
+run="build/run/clientGameTest"; logs="build/m1a-logs"; out="${1:-verification/m1b}"
 export JAVA_HOME="$(/usr/libexec/java_home -v 25)"
-rm -rf build/run "$logs" "$out"; mkdir -p "$run" "$logs" "$out/evidence" "$out/logs"
+rm -rf build/run build/libs "$logs" "$out"; mkdir -p "$run" "$logs" "$out/evidence" "$out/logs"
 
 echo "== build"; ./gradlew build --console=plain > "$logs/build.log" 2>&1; echo "build exit=$?"
 ./gradlew dependencies --configuration compileClasspath --console=plain -q > "$logs/compileClasspath.txt" 2>&1
@@ -22,15 +23,16 @@ rm -f "$run/logs/chatlog.json"
 tools/run-mode.sh live "cpextended.debug=true,mixin.debug.export=true"
 cc=$(find "$run/.mixin.out" -path "*net/minecraft/client/gui/components/ChatComponent.class" | head -1)
 [ -n "$cc" ] && cp "$cc" "$out/evidence/ChatComponent.mixin-export.class"
-for m in restore clear faults conflict_bool conflict_int; do tools/run-mode.sh $m; done
+for m in restore clear faults conflict_bool conflict_int matcher drift; do tools/run-mode.sh $m; done
 
 echo "== V-35"; tools/run-v35.sh | tee "$out/evidence/v35-summary.txt"
 
 echo "== collect"
 cp "$run"/cpx-evidence/*.jsonl "$run"/cpx-evidence/*-mainchat.txt "$run"/cpx-evidence/*-chatlog.json "$out/evidence/" 2>/dev/null
 cp "$logs/compileClasspath.txt" "$out/evidence/"
-unzip -p build/libs/cpextended-*-m1a.jar fabric.mod.json > "$out/evidence/release-fabric.mod.json"
-unzip -l build/libs/cpextended-*-m1a.jar | awk 'NR>3 {print $4}' | grep -v '^$' > "$out/evidence/release-jar-contents.txt"
+jar=$(ls build/libs/cpextended-*.jar | grep -v sources | head -1)
+unzip -p "$jar" fabric.mod.json > "$out/evidence/release-fabric.mod.json"
+unzip -l "$jar" | awk 'NR>3 {print $4}' | grep -v '^$' > "$out/evidence/release-jar-contents.txt"
 for f in "$logs"/*.log; do
   sed -e "s#$HOME#~#g" "$f" | gzip -9 > "$out/logs/$(basename "$f").gz"
 done

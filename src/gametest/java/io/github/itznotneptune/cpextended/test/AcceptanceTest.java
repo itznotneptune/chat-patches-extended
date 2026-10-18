@@ -12,6 +12,7 @@ import io.github.itznotneptune.cpextended.core.Capture;
 import io.github.itznotneptune.cpextended.core.Diagnostics;
 import io.github.itznotneptune.cpextended.core.MessageRecord;
 import io.github.itznotneptune.cpextended.core.Origin;
+import io.github.itznotneptune.cpextended.core.Reconciler;
 import io.github.itznotneptune.cpextended.core.Router;
 import io.github.itznotneptune.cpextended.core.SessionMirror;
 import io.github.itznotneptune.cpextended.core.TabState;
@@ -83,6 +84,8 @@ public final class AcceptanceTest implements FabricClientGameTest {
 				case "restore" -> restore();
 				case "clear" -> clear();
 				case "faults" -> faults();
+				case "matcher" -> matcher();
+				case "drift" -> drift();
 				case "conflict_bool", "conflict_int" -> conflict();
 				case "structural_off", "structural_base", "structural_tabs" -> structural();
 				default -> ev.data("error", "msg", "unknown mode " + mode);
@@ -131,7 +134,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 		return ctx.computeOnClient(c -> {
 			List<Rec> out = new ArrayList<>();
 			for (MessageRecord r : SessionMirror.get().records()) {
-				out.add(new Rec(r.seq(), r.original().getString(), r.origin(), r.ambiguous(), List.copyOf(r.tabIds()), r.message(), r.original(), r));
+				out.add(new Rec(r.seq(), r.original() == null ? "" : r.original().getString(), r.origin(), r.ambiguous(), List.copyOf(r.tabIds()), r.message(), r.original(), r));
 			}
 			return out;
 		});
@@ -258,7 +261,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 			int mainChat = allMessages().size();
 			ev.data("bulk", "chatLogMessageCount", logged, "mirrorRecords", mirrored, "mainChat", mainChat);
 			ev.result("mirror.matchesMainChat", mirrored == mainChat, "mirrorRecords", mirrored, "mainChat", mainChat,
-					"fullReconciles", ctx.computeOnClient(c -> SessionMirror.get().fullReconciles()));
+					"reconcileRebuilds", ctx.computeOnClient(c -> Reconciler.rebuilds()));
 		}
 		waitT(40); // disconnect: Chat Patches writes logs/chatlog.json
 	}
@@ -589,8 +592,9 @@ public final class AcceptanceTest implements FabricClientGameTest {
 		}
 		install(liveConfig());
 		double adversarialWorst = ((Number) ((Map<?, ?>) results.get("adversarial/32768")).get("worstMs")).doubleValue();
-		ev.result("V-37", worstRealistic < 50, "matcherCost20Tabs", results, "endToEnd", e2e, "worstRealisticMs", round(worstRealistic),
-				"adversarialWorstMs", round(adversarialWorst), "criterion", "no frame stall over 50 ms (realistic variants); adversarial reported separately");
+		ev.result("V-37", worstRealistic < 50 && adversarialWorst < 50, "matcherCost20Tabs", results, "endToEnd", e2e,
+				"worstRealisticMs", round(worstRealistic), "adversarialWorstMs", round(adversarialWorst),
+				"criterion", "no frame stall over 50 ms, including the R-1 adversarial case (1b)");
 	}
 
 	RoutingConfig twentyTabs(String pattern) {
@@ -992,5 +996,283 @@ public final class AcceptanceTest implements FabricClientGameTest {
 		}
 		ev.result("structural.setup." + mode, setupOk, "state", state, "mainChatEntries", main.size(),
 				"note", "main chat and chatlog.json are compared across structural_off/base/tabs by tools/compare_structural.py");
+	}
+	// =================================================================== matcher (R-1, Milestone 1b)
+
+	void matcher() {
+		Map<String, Object> d1 = MatcherDifferential.differential(20261018L, 150_000);
+		Map<String, Object> d2 = MatcherDifferential.differential(1_000_003L, 150_000);
+		Map<String, Object> single = MatcherDifferential.singleUnitSweep();
+		Map<String, Object> supp = MatcherDifferential.supplementarySweep();
+		Map<String, Object> bound = MatcherDifferential.boundaryLengths(1024L);
+		boolean same = true;
+		for (Map<String, Object> m : List.of(d1, d2, single, supp, bound)) same &= ((List<?>) m.get("mismatches")).isEmpty();
+		ev.result("R-1.differential", same, "random1", d1, "random2", d2, "singleUnitSweep", single, "supplementarySweep", supp, "boundaryLengths", bound);
+
+		Random rnd = new Random(37);
+		String bmpPattern = randomLetters(rnd, 1024);
+		Map<String, Object> t = new LinkedHashMap<>();
+		t.put("adversarial-bmp", MatcherDifferential.timing("a".repeat(1023) + "b", "a".repeat(32768), false, 5));
+		t.put("adversarial-bmp-caseSensitive", MatcherDifferential.timing("a".repeat(1023) + "b", "a".repeat(32768), true, 5));
+		t.put("adversarial-mixedCase", MatcherDifferential.timing("aA".repeat(511) + "aB", "Aa".repeat(16384), false, 5));
+		t.put("adversarial-surrogatePairs", MatcherDifferential.timing("𐐀".repeat(511) + "𐐁", "𐐀".repeat(16384), false, 5));
+		t.put("adversarial-surrogatePairsCaseFolded", MatcherDifferential.timing("𐐨".repeat(511) + "𐐩", "𐐀".repeat(16384), false, 5));
+		t.put("realistic-bmp", MatcherDifferential.timing(bmpPattern, randomLetters(rnd, 32768), false, 20));
+		t.put("realistic-emoji", MatcherDifferential.timing("😀".repeat(511) + "zz", emojiHeavy(rnd, 32768), false, 20));
+		String tail = randomLetters(rnd, 1024);
+		t.put("matchAtEnd", MatcherDifferential.timing(tail.toUpperCase(java.util.Locale.ROOT), randomLetters(rnd, 31744) + tail, false, 20));
+		// Documented trade-off: a surrogate pattern meeting text with a lone surrogate keeps the original scan (exactness).
+		Map<String, Object> fallback = MatcherDifferential.timing("\uD801\uDC00".repeat(511) + "\uD801\uDC01",
+				"\uD801\uDC00".repeat(16383) + "x\uD801", false, 3); // lone high at the end: every position is a near-match
+		boolean fast = true, sameResults = Boolean.TRUE.equals(fallback.get("sameResult"));
+		for (Object o : t.values()) {
+			Map<?, ?> m = (Map<?, ?>) o;
+			fast &= ((Number) m.get("optimizedWorstMs")).doubleValue() < 50;
+			sameResults &= Boolean.TRUE.equals(m.get("sameResult"));
+		}
+		Map<String, Object> env = row("java", System.getProperty("java.vm.name") + " " + System.getProperty("java.version"),
+				"os", System.getProperty("os.name") + " " + System.getProperty("os.version") + " " + System.getProperty("os.arch"),
+				"processors", Runtime.getRuntime().availableProcessors(), "maxHeapMb", Runtime.getRuntime().maxMemory() >> 20,
+				"method", "20 matchers per message on the client thread; worst and mean of N timed rounds after 2 warm-up rounds;"
+						+ " reference = 1a matcher (bd6ccbb), optimized = 1b matcher with one shared MatchText per message");
+		ev.result("R-1.performance", fast && sameResults, "environment", env, "timings", t, "target", "optimized worst < 50 ms for every scenario",
+				"tradeOffOriginalScanKept", fallback,
+				"tradeOffNote", "lone surrogate in the text (only possible for client-generated text) with a surrogate-containing pattern; not part of the target");
+	}
+
+	// =================================================================== drift (Reconciler, Milestone 1b)
+
+	record Snap(List<GuiMessage> main, int chatLog) {}
+
+	Snap snap(Minecraft c) {
+		return new Snap(new ArrayList<>(allMessagesReflective(c.gui.getChat())), ChatLog.messageCount());
+	}
+
+	static boolean sameIdentity(List<GuiMessage> a, List<GuiMessage> b) {
+		if (a.size() != b.size()) return false;
+		for (int i = 0; i < a.size(); i++) if (a.get(i) != b.get(i)) return false;
+		return true;
+	}
+
+	/** Mirror = main chat entry for entry; tabs hold only live records, in mirror order, each once, each with its tab id. */
+	Map<String, Object> invariants() {
+		return ctx.computeOnClient(c -> {
+			List<GuiMessage> all = allMessagesReflective(c.gui.getChat());
+			List<MessageRecord> recs = SessionMirror.get().records();
+			boolean aligned = recs.size() == all.size();
+			for (int i = 0; aligned && i < recs.size(); i++) aligned = recs.get(i).message() == all.get(all.size() - 1 - i);
+			Map<MessageRecord, Integer> order = new IdentityHashMap<>();
+			for (int i = 0; i < recs.size(); i++) order.put(recs.get(i), i);
+			boolean tabsOk = true;
+			int tabEntries = 0;
+			for (TabState t : SessionMirror.get().tabStates()) {
+				int last = -1;
+				Set<MessageRecord> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+				for (MessageRecord r : t.entries()) {
+					Integer idx = order.get(r);
+					tabsOk &= idx != null && idx > last && seen.add(r) && r.tabIds().contains(t.id());
+					if (idx != null) last = idx;
+					tabEntries++;
+				}
+			}
+			return row("aligned", aligned, "tabsConsistent", tabsOk, "records", recs.size(), "mainChat", all.size(), "tabEntries", tabEntries,
+					"openFrames", Capture.depth());
+		});
+	}
+
+	boolean invOk(Map<String, Object> inv) {
+		return Boolean.TRUE.equals(inv.get("aligned")) && Boolean.TRUE.equals(inv.get("tabsConsistent")) && Integer.valueOf(0).equals(inv.get("openFrames"));
+	}
+
+	/** Applies a main-chat mutation as another mod would, then runs two reconcile passes in the same client task. */
+	Map<String, Object> mutateAndReconcile(java.util.function.Consumer<List<GuiMessage>> mutation) {
+		return ctx.computeOnClient(c -> {
+			ChatComponent chat = c.gui.getChat();
+			mutation.accept(allMessagesReflective(chat));
+			chat.rescaleChat();
+			Snap before = snap(c);
+			Reconciler.Report first = Reconciler.run(chat);
+			Reconciler.Report second = Reconciler.run(chat);
+			Snap after = snap(c);
+			return row("first", first, "second", second, "mainChatUnchangedByReconcile", sameIdentity(before.main(), after.main()),
+					"chatLogUnchangedByReconcile", before.chatLog() == after.chatLog(), "secondPassNoChange", second.aligned() && !second.changed());
+		});
+	}
+
+	static boolean passOk(Map<String, Object> m) {
+		return Boolean.TRUE.equals(m.get("mainChatUnchangedByReconcile")) && Boolean.TRUE.equals(m.get("chatLogUnchangedByReconcile"))
+				&& Boolean.TRUE.equals(m.get("secondPassNoChange"));
+	}
+
+	GuiMessage foreign(Minecraft c, String text) {
+		return new GuiMessage(c.gui.getGuiTicks(), Component.literal(text), null, null);
+	}
+
+	GuiMessage mainEntry(String token) {
+		return ctx.computeOnClient(c -> {
+			for (GuiMessage g : allMessagesReflective(c.gui.getChat())) if (g.content().getString().contains(token)) return g;
+			return null;
+		});
+	}
+
+	long tokInTab(String tab, String token) {
+		return tabEntries(tab).stream().filter(r -> r.original() != null && r.original().getString().contains(token)).count();
+	}
+
+	void drift() {
+		install(config(matchAll("all"), tab("tok", "cpx#")));
+		try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
+			waitT(40);
+			for (int i = 0; i < 10; i++) sys(sp, "drift base " + i + " cpx#D-" + i);
+			waitT(10);
+			ev.result("1b.baseline", invOk(invariants()), "invariants", invariants());
+
+			// 1. Additions that bypass capture (another mod writing allMessages directly).
+			GuiMessage[] added = new GuiMessage[3];
+			Map<String, Object> add = mutateAndReconcile(all -> {
+				Minecraft c = Minecraft.getInstance();
+				added[0] = foreign(c, "foreign newest cpx#FX-1");
+				added[1] = foreign(c, "foreign middle cpx#FX-2");
+				added[2] = foreign(c, "foreign oldest cpx#FX-3");
+				all.add(0, added[0]);
+				all.add(all.size() / 2, added[1]);
+				all.add(all.size(), added[2]);
+			});
+			List<Rec> unobs = recs().stream().filter(r -> r.origin() == Origin.UNOBSERVED).toList();
+			boolean unobsOk = unobs.size() == 3 && unobs.stream().allMatch(r -> r.original() == null && r.tabs().isEmpty())
+					&& unobs.stream().map(Rec::msg).allMatch(g -> g == added[0] || g == added[1] || g == added[2]);
+			Map<String, Object> inv = invariants();
+			ev.result("1b.injectedAdditions", passOk(add) && unobsOk && invOk(inv) && ((Reconciler.Report) add.get("first")).unobserved() == 3,
+					"pass", add, "unobservedRecords", unobs.size(), "unobservedHaveNoOriginalOrTabs", unobsOk, "invariants", inv,
+					"note", "never-captured entries stay in the main chat as UNOBSERVED records: no original, no routing, never hidden");
+
+			// 2. Removals by another mod.
+			GuiMessage d2 = mainEntry("cpx#D-2"), d5 = mainEntry("cpx#D-5");
+			Map<String, Object> rem = mutateAndReconcile(all -> all.removeIf(g -> g == d2 || g == d5));
+			inv = invariants();
+			boolean gone = tokInTab("tok", "cpx#D-2") == 0 && tokInTab("tok", "cpx#D-5") == 0 && tokInTab("all", "cpx#D-2") == 0;
+			ev.result("1b.injectedRemovals", passOk(rem) && gone && invOk(inv) && ((Reconciler.Report) rem.get("first")).stale() == 2,
+					"pass", rem, "removedFromTabs", gone, "invariants", inv);
+
+			// 3. Reordering by another mod.
+			GuiMessage d7 = mainEntry("cpx#D-7"), d8 = mainEntry("cpx#D-8");
+			Map<String, Object> ord = mutateAndReconcile(all -> {
+				int i7 = all.indexOf(d7), i8 = all.indexOf(d8);
+				all.set(i7, d8);
+				all.set(i8, d7);
+				int f = all.indexOf(added[1]);
+				all.remove(f);
+				all.add(0, added[1]);
+			});
+			inv = invariants();
+			List<String> tokOrder = tabEntries("tok").stream().map(r -> r.original().getString().replaceAll(".*(cpx#D-\\d).*", "$1"))
+					.filter(x -> x.startsWith("cpx#D-")).toList();
+			ev.result("1b.injectedReorder", passOk(ord) && invOk(inv) && ((Reconciler.Report) ord.get("first")).reordered()
+							&& tokOrder.indexOf("cpx#D-8") < tokOrder.indexOf("cpx#D-7"),
+					"pass", ord, "tokTabOrder", tokOrder, "invariants", inv);
+
+			// 4. Abandoned capture frames (development hook: frames opened and never closed).
+			Map<String, Object> ab = ctx.computeOnClient(c -> {
+				ChatComponent chat = c.gui.getChat();
+				Capture.devAbandonFrame(chat, Component.literal("abandoned before decision cpx#AB-0"), 0);
+				Capture.devAbandonFrame(chat, Component.literal("abandoned after decision cpx#AB-1"), 1);
+				Capture.devAbandonFrame(chat, Component.literal("abandoned after delivery cpx#AB-2"), 2);
+				int openBefore = Capture.depth();
+				Snap before = snap(c);
+				Reconciler.Report first = Reconciler.run(chat);
+				Reconciler.Report second = Reconciler.run(chat);
+				Snap after = snap(c);
+				return row("openBefore", openBefore, "first", first, "second", second, "mainChatUnchangedByReconcile", sameIdentity(before.main(), after.main()),
+						"chatLogUnchangedByReconcile", before.chatLog() == after.chatLog(), "secondPassNoChange", second.aligned() && !second.changed());
+			});
+			Reconciler.Report abr = (Reconciler.Report) ab.get("first");
+			inv = invariants();
+			Rec ab0 = recs().stream().filter(r -> r.msg() == mainEntry("cpx#AB-0")).findFirst().orElse(null);
+			boolean abOk = passOk(ab) && invOk(inv) && Integer.valueOf(3).equals(ab.get("openBefore")) && abr.abandonedFrames() == 3
+					&& abr.recoveredFromFrames() == 1 && tokInTab("tok", "cpx#AB-1") == 1 && tokInTab("tok", "cpx#AB-2") == 1
+					&& tokInTab("all", "cpx#AB-1") == 1 && ab0 != null && ab0.origin() == Origin.UNOBSERVED;
+			ev.result("1b.abandonedFrames", abOk, "pass", ab, "ab0Origin", ab0 == null ? null : ab0.origin(),
+					"ab1InTok", tokInTab("tok", "cpx#AB-1"), "ab2InTok", tokInTab("tok", "cpx#AB-2"), "invariants", inv,
+					"note", "decided-but-undelivered frame delivered once (its message is in the main chat); undecided frame -> UNOBSERVED");
+
+			// 5. Partial and interrupted admissions (foreign mod cancels or throws after Extended's wrappers allowed it).
+			sys(sp, "[CANCEL-Q] partial queue cpx#PQ");
+			sys(sp, "[CANCEL-D] partial display cpx#PD");
+			waitT(4);
+			boolean threw = ctx.computeOnClient(c -> {
+				try {
+					c.gui.getChat().addMessage(Component.literal("[THROW-Q] interrupted cpx#PT"));
+					return false;
+				} catch (RuntimeException e) {
+					return true;
+				}
+			});
+			waitT(3);
+			inv = invariants();
+			boolean pq = !mainChatContains("cpx#PQ") && tokInTab("tok", "cpx#PQ") == 0 && recsWith("cpx#PQ").isEmpty();
+			boolean pd = mainChatContains("cpx#PD") && tokInTab("tok", "cpx#PD") == 1;
+			boolean pt = threw && !mainChatContains("cpx#PT") && tokInTab("tok", "cpx#PT") == 0 && recsWith("cpx#PT").isEmpty();
+			ev.result("1b.partialAndInterruptedAdmissions", pq && pd && pt && invOk(inv), "cancelledQueueRemovedFromTabs", pq,
+					"cancelledDisplayKept", pd, "interruptedRemovedFromTabs", pt, "exceptionReachedCaller", threw, "invariants", inv,
+					"note", "liveness follows allMessages (approved §4.7); a message the main chat never kept leaves every tab");
+
+			// 13. Deletion by Chat Patches (context-menu delete path).
+			GuiMessage d9 = mainEntry("cpx#D-9");
+			ctx.runOnClient(c -> obro1961.chatpatches.util.ChatUtil.deleteMessage(d9, false));
+			waitT(3);
+			inv = invariants();
+			ev.result("1b.chatPatchesDeletion", d9 != null && tokInTab("tok", "cpx#D-9") == 0 && tokInTab("all", "cpx#D-9") == 0 && invOk(inv), "invariants", inv);
+
+			// 12. 3,000-message burst, then reconciliation.
+			ctx.runOnClient(c -> Reconciler.resetStats());
+			sp.getServer().runOnServer(s -> {
+				for (int i = 0; i < 3000; i++) s.getPlayerList().broadcastSystemMessage(Component.literal("burst " + i + " cpx#BU-" + i), false);
+			});
+			waitT(80);
+			inv = invariants();
+			double burstMax = ctx.computeOnClient(c -> Reconciler.maxNanos()) / 1e6;
+			long burstInTok = tabEntries("tok").stream().filter(r -> r.original() != null && r.original().getString().contains("cpx#BU-")).count();
+			ev.result("1b.burst3000", invOk(inv) && burstInTok == 3000 && burstMax < 50, "invariants", inv, "burstEntriesInTok", burstInTok,
+					"reconcileMaxMsDuringBurst", round(burstMax), "passes", ctx.computeOnClient(c -> Reconciler.passes()));
+
+			// 10/11. 16,384 retained entries.
+			int previousCap = ctx.computeOnClient(c -> ChatPatches.config.chatMaxMessages);
+			ctx.runOnClient(c -> ChatPatches.config.chatMaxMessages = 16384);
+			for (int chunk = 0; chunk < 16; chunk++) {
+				int base = chunk * 1024;
+				ctx.runOnClient(c -> {
+					for (int i = 0; i < 1024; i++) c.gui.getChat().addMessage(Component.literal("bulk16k " + (base + i) + " cpx#K16-" + (base + i)));
+				});
+			}
+			waitT(5);
+			Map<String, Object> full = invariants();
+			ctx.runOnClient(c -> Reconciler.resetStats());
+			waitT(100);
+			double steadyMax = ctx.computeOnClient(c -> Reconciler.maxNanos()) / 1e6;
+			Random rnd = new Random(16384);
+			Map<String, Object> big = mutateAndReconcile(all -> {
+				Minecraft c = Minecraft.getInstance();
+				for (int i = 0; i < 100; i++) all.remove(rnd.nextInt(all.size()));
+				for (int i = 0; i < 100; i++) all.add(rnd.nextInt(all.size() + 1), foreign(c, "foreign16k " + i + " cpx#F16-" + i));
+				for (int i = 0; i < 50; i++) {
+					int a = rnd.nextInt(all.size()), b = rnd.nextInt(all.size());
+					GuiMessage x = all.get(a);
+					all.set(a, all.get(b));
+					all.set(b, x);
+				}
+			});
+			Reconciler.Report br = (Reconciler.Report) big.get("first");
+			Map<String, Object> afterBig = invariants();
+			ctx.runOnClient(c -> Reconciler.resetStats());
+			waitT(40);
+			double steadyAfter = ctx.computeOnClient(c -> Reconciler.maxNanos()) / 1e6;
+			ev.result("1b.reconcile16384", Integer.valueOf(16384).equals(full.get("mainChat")) && invOk(full) && passOk(big) && invOk(afterBig)
+							&& br.unobserved() == 100 && br.stale() == 100 && br.nanos() / 1e6 < 50 && steadyMax < 50 && steadyAfter < 50,
+					"filled", full, "steadyTickMaxMs", round(steadyMax), "driftPass", big, "driftPassMs", round(br.nanos() / 1e6),
+					"steadyTickMaxMsAfterDrift", round(steadyAfter), "invariantsAfter", afterBig,
+					"drift", "100 removals, 100 foreign insertions, 50 random swaps (seed 16384)");
+			ctx.runOnClient(c -> ChatPatches.config.chatMaxMessages = previousCap);
+		}
+		waitT(20);
 	}
 }

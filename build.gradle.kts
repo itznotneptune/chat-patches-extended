@@ -58,7 +58,8 @@ loom {
 dependencies {
     minecraft("com.mojang:minecraft:$minecraftVersion")
     mappings(loom.officialMojangMappings())
-    modImplementation("net.fabricmc:fabric-loader:$loaderVersion")
+    // -PruntimeLoader=x.y.z runs the dev environment on another Loader (V-64); the built metadata keeps loader_version.
+    modImplementation("net.fabricmc:fabric-loader:${(project.findProperty("runtimeLoader") as String?) ?: loaderVersion}")
     for (m in fabricModules) modImplementation(fabricApi.module(m, fabricApiVersion))
 
     // Optional Mod Menu integration (Q20): compile-only; present at dev runtime only with -Pextras=modmenu (V-14, V-38).
@@ -87,7 +88,7 @@ dependencies {
     }
 }
 
-// Optional mods for compatibility runs: -Pextras=modmenu,ncr
+// Optional mods for compatibility runs: -Pextras=modmenu,ncr,chatheads
 val extras = ((project.findProperty("extras") as String?) ?: "").split(",").filter { it.isNotBlank() }
 dependencies {
     if ("modmenu" in extras) {
@@ -95,6 +96,7 @@ dependencies {
         modLocalRuntime("maven.modrinth:placeholder-api:${project.property("placeholder_api_version")}")
     }
     if ("ncr" in extras) modLocalRuntime("maven.modrinth:no-chat-reports:${project.property("ncr_version")}")
+    if ("chatheads" in extras) modLocalRuntime("maven.modrinth:chat-heads:${project.property("chatheads_version")}")
 }
 
 tasks.processResources {
@@ -112,4 +114,11 @@ tasks.processResources {
 
 tasks.jar {
     from("LICENSE", "COPYING")
+}
+
+// Reproducible archives (release candidate): fixed timestamps and a stable entry order, so the same sources and
+// toolchain give byte-identical jars.
+tasks.withType<AbstractArchiveTask>().configureEach {
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
 }

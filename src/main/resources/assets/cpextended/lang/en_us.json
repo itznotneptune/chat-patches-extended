@@ -41,6 +41,7 @@
   "cpextended.gui.name": "Name",
   "cpextended.gui.match_all": "All: %s",
   "cpextended.gui.hide": "Hide from main chat: %s",
+  "cpextended.gui.hide.tooltip": "Matching messages are kept out of the main chat and shown only in this tab. Hidden messages are kept for this session only (up to Chat Patches' history limit); Chat Patches' chat log is not a guaranteed backup. Deleting this tab later moves its hidden messages back to the main chat, or is refused if that would lose any of them.",
   "cpextended.gui.restore": "Restored history: %s",
   "cpextended.gui.pattern": "Pattern",
   "cpextended.gui.replace": "Replace",
@@ -53,11 +54,11 @@
   "cpextended.search.invalid": "Invalid search expression",
   "cpextended.gui.orphans.title": "Move hidden messages back to the main chat?",
   "cpextended.gui.orphans.message": "%1$s hidden message(s) held only by %2$s will return to the main chat in their original order. No visible message will be pruned.",
-  "cpextended.gui.orphans.message_pruned": "%1$s hidden message(s) held only by %2$s will return to the main chat in their original order. %3$s older visible message(s) will be pruned by Chat Patches' history limit.",
+  "cpextended.gui.orphans.message_pruned": "%1$s hidden message(s) held only by %2$s will return to the main chat in their original order. %3$s older visible message(s) will be pruned by Chat Patches' history limit and may not be recoverable.",
   "cpextended.gui.delete_window.choose": "Delete window %s: move or delete each tab",
   "cpextended.gui.hiding.on": "Hiding: On",
   "cpextended.gui.hiding.off": "Hiding: Off",
   "cpextended.gui.hiding.paused": "Hiding: Paused",
-  "cpextended.gui.hiding.tooltip": "Global switch for hiding routed messages from the main chat. Turning it off keeps already hidden messages in their tabs.",
+  "cpextended.gui.hiding.tooltip": "Global switch for hiding routed messages from the main chat. Turning it off keeps already hidden messages in their tabs. Hidden messages are kept for this session only; Chat Patches' chat log is not a guaranteed backup.",
   "cpextended.gui.hiding.paused.tooltip": "Hiding is paused for this session because of a compatibility problem with Chat Patches (see the log). Tabs keep receiving messages; hidden ones stay in their tabs."
 }

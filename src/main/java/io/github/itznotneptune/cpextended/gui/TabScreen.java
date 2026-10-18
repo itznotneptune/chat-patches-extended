@@ -127,7 +127,8 @@ public final class TabScreen extends BaseScreen {
 		addRenderableWidget(nameBox);
 		addRenderableWidget(toggle("cpextended.gui.enabled", enabled, width / 2 + 4, y, () -> enabled = !enabled));
 		addRenderableWidget(toggle("cpextended.gui.match_all", matchAll, width / 2 + 81, y, () -> matchAll = !matchAll));
-		addRenderableWidget(toggle("cpextended.gui.hide", hide, width / 2 - 154, y + ROW, () -> hide = !hide));
+		Button hideToggle = addRenderableWidget(toggle("cpextended.gui.hide", hide, width / 2 - 154, y + ROW, () -> hide = !hide));
+		hideToggle.setTooltip(net.minecraft.client.gui.components.Tooltip.create(Component.translatable("cpextended.gui.hide.tooltip")));
 		addRenderableWidget(toggle("cpextended.gui.restore", restore, width / 2 + 4, y + ROW, () -> restore = !restore));
 
 		List<FilterRow> visible = rows.stream().filter(r -> !r.deleted).toList();

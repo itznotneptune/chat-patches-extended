@@ -303,15 +303,26 @@ public final class OrphanRestore {
 		}
 	}
 
-	/** Client tick: retries a failed line rebuild while no chat screen is open (Chat Patches search filters lines there). */
+	/**
+	 * Client tick: retries a failed line rebuild while no chat screen is open (Chat Patches search filters lines there):
+	 * three scheduled attempts, then after every later chat close and every later rescale (a change of anything that
+	 * makes vanilla rebuild the chat lines: GUI scale, window size, chat scale, width, line spacing or height). A retry
+	 * only rebuilds derived lines from the committed list; it never touches messages, references or configuration.
+	 */
 	public static void tick(Minecraft mc) {
 		boolean chatOpen = mc.screen instanceof ChatScreen;
 		boolean chatJustClosed = chatWasOpen && !chatOpen;
 		chatWasOpen = chatOpen;
+		long layout = layoutSignature(mc);
+		boolean rescaled = layout != lastLayout;
+		if (rescaled && chatOpen) rescalePending = true; // retried once the chat closes
+		lastLayout = layout;
 		if (!linesDirty || chatOpen) return;
+		boolean rescaleTrigger = rescaled || rescalePending;
+		rescalePending = false;
 		int now = mc.gui.getGuiTicks();
 		boolean scheduled = rebuildAttempts < 3 && now >= nextRebuildTick;
-		if (!scheduled && !(rebuildAttempts >= 3 && chatJustClosed)) return;
+		if (!scheduled && !(rebuildAttempts >= 3 && (chatJustClosed || rescaleTrigger)) && !(rebuildAttempts < 3 && rescaleTrigger)) return;
 		if (rebuildLines(mc.gui.getChat())) {
 			linesDirty = false;
 			rebuildAttempts = 0;
@@ -327,6 +338,24 @@ public final class OrphanRestore {
 	}
 
 	public static boolean linesDirty() { return linesDirty; }
+
+	private static long lastLayout;
+	private static boolean rescalePending;
+
+	/** Everything whose change makes vanilla rebuild the chat lines (GUI rescale, window resize, chat display options). */
+	private static long layoutSignature(Minecraft mc) {
+		var w = mc.getWindow();
+		var o = mc.options;
+		long h = w.getGuiScale();
+		h = h * 31 + w.getGuiScaledWidth();
+		h = h * 31 + w.getGuiScaledHeight();
+		h = h * 31 + Double.hashCode(o.chatScale().get());
+		h = h * 31 + Double.hashCode(o.chatWidth().get());
+		h = h * 31 + Double.hashCode(o.chatLineSpacing().get());
+		h = h * 31 + Double.hashCode(o.chatHeightFocused().get());
+		h = h * 31 + Double.hashCode(o.chatHeightUnfocused().get());
+		return h;
+	}
 
 	// ---------------------------------------------------------------- development only
 

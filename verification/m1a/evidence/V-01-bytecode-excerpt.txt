@@ -1,0 +1,64 @@
+javap -p -c of the mixin-exported ChatComponent (live run, -Dmixin.debug.export=true): invocations per method
+
+public void clearMessages(boolean);
+    InvokeDynamic #2:call:(Lnet/minecraft/client/gui/components/ChatComponent;)Lcom/llamalad7/mixinextras/injector/wrapoperation/Operation;
+    Method wrapMethod$zzc000$cpextended$syncClear:(ZLcom/llamalad7/mixinextras/injector/wrapoperation/Operation;)V
+
+public void addMessage(net.minecraft.network.chat.Component, net.minecraft.network.chat.MessageSignature, net.minecraft.client.GuiMessageTag);
+    InvokeDynamic #3:call:(Lnet/minecraft/client/gui/components/ChatComponent;)Lcom/llamalad7/mixinextras/injector/wrapoperation/Operation;
+    Method wrapMethod$zzc000$cpextended$captureFrame:(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/GuiMessageTag;Lcom/llamalad7/mixinextras/injector/wrapoperation/Operation;)V
+
+private void wrapMethod$zzc000$cpextended$captureFrame(net.minecraft.network.chat.Component, net.minecraft.network.chat.MessageSignature, net.minecraft.client.GuiMessageTag, com.llamalad7.mixinextras.injector.wrapoperation.Operation);
+    Method io/github/itznotneptune/cpextended/core/Capture.enter:(Lnet/minecraft/client/gui/components/ChatComponent;Lnet/minecraft/network/chat/Component;Lnet/minecraft/client/GuiMessageTag;)Z
+    InterfaceMethod com/llamalad7/mixinextras/injector/wrapoperation/Operation.call:([Ljava/lang/Object;)Ljava/lang/Object;
+    Method io/github/itznotneptune/cpextended/core/Capture.exit:(Lnet/minecraft/client/gui/components/ChatComponent;)V
+    Method io/github/itznotneptune/cpextended/core/Capture.exit:(Lnet/minecraft/client/gui/components/ChatComponent;)V
+
+private boolean wrapWithCondition$zzc000$cpextended$admitToDisplay(net.minecraft.client.gui.components.ChatComponent, net.minecraft.client.GuiMessage);
+    Method io/github/itznotneptune/cpextended/core/Capture.admitDisplay:(Lnet/minecraft/client/GuiMessage;)Z
+
+private boolean wrapWithCondition$zzc000$cpextended$admitToMessages(net.minecraft.client.gui.components.ChatComponent, net.minecraft.client.GuiMessage);
+    Method io/github/itznotneptune/cpextended/core/Capture.admitMessages:(Lnet/minecraft/client/GuiMessage;)Z
+
+private void wrapMethod$zzc000$cpextended$syncClear(boolean, com.llamalad7.mixinextras.injector.wrapoperation.Operation);
+    Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+    InterfaceMethod com/llamalad7/mixinextras/injector/wrapoperation/Operation.call:([Ljava/lang/Object;)Ljava/lang/Object;
+    Method io/github/itznotneptune/cpextended/core/Capture.afterClear:(Lnet/minecraft/client/gui/components/ChatComponent;Z)V
+
+public java.util.List cpextended$getAllMessages();
+
+private void addMessage$mixinextras$wrapped$63(net.minecraft.network.chat.Component, net.minecraft.network.chat.MessageSignature, net.minecraft.client.GuiMessageTag);
+    Method org/spongepowered/asm/mixin/injection/callback/CallbackInfo."<init>":(Ljava/lang/String;Z)V
+    Method handler$bdi000$chatpatches$queueMessageWhileLoading:(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/GuiMessageTag;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V
+    Method org/spongepowered/asm/mixin/injection/callback/CallbackInfo.isCancelled:()Z
+    Method localvar$bdi000$chatpatches$modifyMessage:(Lnet/minecraft/network/chat/Component;)Lnet/minecraft/network/chat/Component;
+    Method net/minecraft/client/gui/Gui.getGuiTicks:()I
+    Method net/minecraft/client/GuiMessage."<init>":(ILnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/GuiMessageTag;)V
+    Method logChatMessage:(Lnet/minecraft/client/GuiMessage;)V
+    Method wrapWithCondition$zzc000$cpextended$admitToDisplay:(Lnet/minecraft/client/gui/components/ChatComponent;Lnet/minecraft/client/GuiMessage;)Z
+    Method addMessageToDisplayQueue:(Lnet/minecraft/client/GuiMessage;)V
+    Method wrapWithCondition$zzc000$cpextended$admitToMessages:(Lnet/minecraft/client/gui/components/ChatComponent;Lnet/minecraft/client/GuiMessage;)Z
+    Method addMessageToQueue:(Lnet/minecraft/client/GuiMessage;)V
+
+private java.lang.Void mixinextras$bridge$addMessage$mixinextras$wrapped$63$64(java.lang.Object[]);
+    Method com/llamalad7/mixinextras/injector/wrapoperation/WrapOperationRuntime.checkArgumentCount:([Ljava/lang/Object;ILjava/lang/String;)V
+    Method addMessage$mixinextras$wrapped$63:(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/GuiMessageTag;)V
+
+private void clearMessages$mixinextras$wrapped$65(boolean);
+    Method org/spongepowered/asm/mixin/injection/callback/CallbackInfo."<init>":(Ljava/lang/String;Z)V
+    Method handler$bdi000$chatpatches$clear:(ZLorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V
+    Method org/spongepowered/asm/mixin/injection/callback/CallbackInfo.isCancelled:()Z
+    Method net/minecraft/client/Minecraft.getChatListener:()Lnet/minecraft/client/multiplayer/chat/ChatListener;
+    Method net/minecraft/client/multiplayer/chat/ChatListener.flushQueue:()V
+    InterfaceMethod java/util/List.clear:()V
+    InterfaceMethod java/util/List.clear:()V
+    InterfaceMethod java/util/List.clear:()V
+    Method net/minecraft/util/ArrayListDeque.clear:()V
+    Method net/minecraft/client/Minecraft.commandHistory:()Lnet/minecraft/client/CommandHistory;
+    Method net/minecraft/client/CommandHistory.history:()Ljava/util/Collection;
+    Method net/minecraft/util/ArrayListDeque.addAll:(Ljava/util/Collection;)Z
+
+private java.lang.Void mixinextras$bridge$clearMessages$mixinextras$wrapped$65$66(java.lang.Object[]);
+    Method com/llamalad7/mixinextras/injector/wrapoperation/WrapOperationRuntime.checkArgumentCount:([Ljava/lang/Object;ILjava/lang/String;)V
+    Method java/lang/Boolean.booleanValue:()Z
+    Method clearMessages$mixinextras$wrapped$65:(Z)V

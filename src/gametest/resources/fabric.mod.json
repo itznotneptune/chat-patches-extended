@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "cpextended_test",
+  "version": "0.0.0",
+  "name": "Chat Patches Extended acceptance tests",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-client-gametest": ["io.github.itznotneptune.cpextended.test.AcceptanceTest"]
+  },
+  "mixins": ["cpextended_test.mixins.json"],
+  "depends": { "cpextended": "*", "chatpatches": "*" }
+}

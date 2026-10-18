@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "io.github.itznotneptune.cpextended.test.mixin",
+  "plugin": "io.github.itznotneptune.cpextended.test.mixin.TestMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "DisplayQueueCounterMixin",
+    "NestedAddMixin",
+    "ConflictBooleanMixin",
+    "ConflictIntMixin"
+  ],
+  "injectors": { "defaultRequire": 1 }
+}

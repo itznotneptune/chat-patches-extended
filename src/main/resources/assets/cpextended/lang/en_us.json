@@ -1,0 +1,7 @@
+{
+  "cpextended.warning.title": "Chat Patches Extended",
+  "cpextended.warning.degraded": "Compatibility problem with Chat Patches. Hiding is off for this session; tabs keep working.",
+  "cpextended.warning.tab_suspended": "Tab \"%s\" hit an error and is suspended until you restart the game.",
+  "cpextended.warning.search_unavailable": "Chat Patches search state can't be read. Search integration is off for this session.",
+  "cpextended.warning.internal": "An internal error occurred. Chat works normally; see the log for details."
+}

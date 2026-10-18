@@ -132,6 +132,11 @@ public final class OrphanRestore {
 	 * respect to live state, except that a misaligned mirror is reconciled first (a safe point is required anyway).
 	 */
 	public static Outcome plan(Set<String> currentTabIds, Set<String> nextTabIds) {
+		return plan(currentTabIds, nextTabIds, String::valueOf);
+	}
+
+	/** As {@link #plan(Set, Set)}; {@code describe} names the tabs in refusal messages (player-facing names, S2). */
+	public static Outcome plan(Set<String> currentTabIds, Set<String> nextTabIds, java.util.function.Function<java.util.Collection<String>, String> describe) {
 		SessionMirror mirror = SessionMirror.get();
 		Set<String> deleted = new LinkedHashSet<>(currentTabIds);
 		deleted.removeAll(nextTabIds);
@@ -145,13 +150,13 @@ public final class OrphanRestore {
 		boolean safe = mc.isSameThread() && !(mc.screen instanceof ChatScreen) && Capture.depth() == 0 && adapter.isSafePoint()
 				&& !(devForceBusy && DevHooks.isDev());
 		if (!safe) {
-			return new Refused(Refusal.BUSY, "Chat is busy (open, loading or restoring its history), so the hidden messages in " + withOrphans
+			return new Refused(Refusal.BUSY, "Chat is busy (open, loading or restoring its history), so the hidden messages in " + describe.apply(withOrphans)
 					+ " can't be moved back safely right now. Nothing was changed; try the change again in a moment.");
 		}
 		OptionalInt capRead = adapter.isDegraded() ? OptionalInt.empty() : adapter.chatMaxMessages();
 		if (capRead.isEmpty()) {
 			return new Refused(Refusal.CAP_UNKNOWN, "Chat Patches' chat history limit can't be read reliably, so moving the hidden messages in "
-					+ withOrphans + " back to the main chat can't be checked for loss. Nothing was changed. " + KEEP_DISABLE_MOVE);
+					+ describe.apply(withOrphans) + " back to the main chat can't be checked for loss. Nothing was changed. " + KEEP_DISABLE_MOVE);
 		}
 		int cap = capRead.getAsInt();
 		ChatComponent chat = mc.gui.getChat();
@@ -161,7 +166,7 @@ public final class OrphanRestore {
 			all = Capture.allMessages(chat);
 			if (!aligned(mirror.records, all)) {
 				return new Refused(Refusal.MAIN_CHAT_INCONSISTENT, "The main chat changed in a way Extended can't account for, so the hidden messages in "
-						+ withOrphans + " can't be placed safely. Nothing was changed; try again in a moment.");
+						+ describe.apply(withOrphans) + " can't be placed safely. Nothing was changed; try again in a moment.");
 			}
 		}
 
@@ -187,7 +192,7 @@ public final class OrphanRestore {
 			else prunedVisible.add(merged.get(i));
 		}
 		if (orphansPruned > 0) {
-			return new Refused(Refusal.WOULD_PRUNE_ORPHAN, orphansPruned + " of the " + orphans.size() + " hidden messages in " + withOrphans
+			return new Refused(Refusal.WOULD_PRUNE_ORPHAN, orphansPruned + " of the " + orphans.size() + " hidden messages in " + describe.apply(withOrphans)
 					+ " are older than everything the main chat keeps (limit " + cap + "), so moving them back would lose them at once. Nothing was changed. "
 					+ KEEP_DISABLE_MOVE);
 		}

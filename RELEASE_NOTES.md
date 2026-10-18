@@ -1,4 +1,13 @@
-# Chat Patches Extended 1.0.0-rc.1 (release candidate, not published)
+# Chat Patches Extended 1.0.0-rc.2 (release candidate, not published)
+
+## Changes since 1.0.0-rc.1
+- **Last-good settings backup:** every successful save now keeps the previous valid version as `config/cpextended.json.bak`, so **Restore from backup** is available after the settings file gets damaged. In rc.1 the backup was written only on file systems without atomic replacement. A broken, newer-version or unapplied externally edited file never becomes the backup.
+- Safety dialogs and refusals name tabs by their names (for example `"Smoke"`), adding the internal id only to tell identically named tabs apart.
+- The filter case button (`aa` / `Aa`) explains itself in a tooltip.
+- The "Restored history" toggle is no longer cut off, and has a tooltip.
+- Windows are listed as "Window 1: Smoke, Everything" instead of by internal id.
+- The settings-file warning wraps instead of being cut off, with a Details button when it's long; the Restore from backup button says why it's unavailable.
+- The empty settings screen explains windows and tabs.
 
 **Target:** Minecraft 1.21.11 · Fabric · Chat Patches 8.0.0 · Java 21+. Client-side. Unofficial; not affiliated with Chat Patches.
 
@@ -16,7 +25,7 @@
 2. **Chat Patches' chat log is not a guaranteed recovery copy.** It logs hidden messages and restores what it holds at the next start, but its own limit and saving behavior decide what survives. In 8.0.0, its log stops saving new messages once it's full and its message count stays the same.
 3. **Deleting a tab that holds hidden messages moves them back to the main chat**, after a confirmation. If the main chat would exceed its limit, the confirmation states how many **older visible messages will be pruned**; those may not be recoverable.
 4. **That deletion is refused, with nothing changed, if any of the hidden messages can't safely survive it.** It's also refused while the chat is busy, or when Chat Patches' history limit can't be read. Keeping, disabling or moving the tab are always safe alternatives.
-5. **Settings file safety:** changes are written to a temporary file and moved into place. A deletion that moves hidden messages back is refused on file systems without atomic file replacement. An external program writing `cpextended.json` within the fraction of a millisecond between Extended's last check and its save can be overwritten; this race remains.
+5. **Settings file safety:** changes are written to a temporary file and moved into place, and the version they replace becomes `cpextended.json.bak` (when it's valid). The two files aren't updated as one unit: after a crash or failure between the two steps, the backup can be one version older. A deletion that moves hidden messages back is refused on file systems without atomic file replacement. An external program writing `cpextended.json` within the fraction of a millisecond between Extended's last check and its save can be overwritten; this race remains.
 
 These guarantees cover failures inside a running game. After a crash or a forced quit, the settings file is either the old or the new version (verified by interrupting the process at each step), and the session state is rebuilt from the file plus Chat Patches' restore. Extended doesn't claim protection against power loss or file-system faults beyond what's described here.
 
@@ -28,4 +37,5 @@ See the README, *Known limitations*. In short:
 - Filters match text only.
 - Chat Heads changes the matched text of player messages.
 - Custom Chat Patches name formats apply to restored messages.
+- Restored messages are routed by the current tabs: a message visible when it first arrived can be hidden after a restart.
 - A tab suspended after an error recovers only after a restart.

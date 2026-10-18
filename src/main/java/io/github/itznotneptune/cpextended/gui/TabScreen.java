@@ -5,12 +5,14 @@ import io.github.itznotneptune.cpextended.config.ConfigEdit;
 import io.github.itznotneptune.cpextended.config.ConfigManager;
 import io.github.itznotneptune.cpextended.config.ConfigParser;
 import io.github.itznotneptune.cpextended.config.ExtendedConfig;
+import io.github.itznotneptune.cpextended.config.Labels;
 import io.github.itznotneptune.cpextended.filter.FilterSpec;
 import io.github.itznotneptune.cpextended.filter.PatternValidator;
 import io.github.itznotneptune.cpextended.model.TabConfig;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
@@ -82,7 +84,7 @@ public final class TabScreen extends BaseScreen {
 	private @Nullable EditBox nameBox;
 
 	public TabScreen(Screen parent, String tabId) {
-		super(Component.translatable("cpextended.gui.tab", tabId), parent);
+		super(Component.translatable("cpextended.gui.tab", Labels.tab(ConfigManager.get().config(), tabId)), parent);
 		this.tabId = tabId;
 		TabConfig c = tabConfig();
 		if (c != null) {
@@ -129,7 +131,8 @@ public final class TabScreen extends BaseScreen {
 		addRenderableWidget(toggle("cpextended.gui.match_all", matchAll, width / 2 + 81, y, () -> matchAll = !matchAll));
 		Button hideToggle = addRenderableWidget(toggle("cpextended.gui.hide", hide, width / 2 - 154, y + ROW, () -> hide = !hide));
 		hideToggle.setTooltip(net.minecraft.client.gui.components.Tooltip.create(Component.translatable("cpextended.gui.hide.tooltip")));
-		addRenderableWidget(toggle("cpextended.gui.restore", restore, width / 2 + 4, y + ROW, () -> restore = !restore));
+		addRenderableWidget(toggle("cpextended.gui.restore", restore, width / 2 + 4, y + ROW, () -> restore = !restore))
+				.setTooltip(Tooltip.create(Component.translatable("cpextended.gui.restore.tooltip")));
 
 		List<FilterRow> visible = rows.stream().filter(r -> !r.deleted).toList();
 		int per = Math.max(1, rowsPerPage() - 1);
@@ -159,8 +162,10 @@ public final class TabScreen extends BaseScreen {
 				}).bounds(x + 130, ry, 72, 20).build());
 				action.active = true;
 			}
-			addRenderableWidget(Button.builder(Component.literal(r.caseSensitive ? "Aa" : "aa"), b -> { r.caseSensitive = !r.caseSensitive; rebuildWidgets(); })
+			// S3: the label keeps its compact form; the tooltip (also narrated) says what it means and what a click does.
+			Button caseToggle = addRenderableWidget(Button.builder(Component.literal(r.caseSensitive ? "Aa" : "aa"), b -> { r.caseSensitive = !r.caseSensitive; rebuildWidgets(); })
 					.bounds(x + 206, ry, 24, 20).build());
+			caseToggle.setTooltip(Tooltip.create(Component.translatable(r.caseSensitive ? "cpextended.gui.case.sensitive" : "cpextended.gui.case.insensitive")));
 			addRenderableWidget(Button.builder(Component.literal("x"), b -> { r.deleted = true; rebuildWidgets(); }).bounds(x + 232, ry, 20, 20).build());
 		}
 		pager(visible.size());
@@ -174,7 +179,7 @@ public final class TabScreen extends BaseScreen {
 
 	private Button toggle(String key, boolean value, int x, int y, Runnable flip) {
 		return Button.builder(Component.translatable(key, Component.translatable(value ? "cpextended.gui.on" : "cpextended.gui.off")), b -> { flip.run(); rebuildWidgets(); })
-				.bounds(x, y, key.endsWith("hide") ? 150 : 73, 20).build();
+				.bounds(x, y, key.endsWith("hide") || key.endsWith("restore") ? 150 : 73, 20).build(); // M1: the two longer labels get full width
 	}
 
 	/** Validates new and changed filters, then applies every change atomically. Returns whether it saved. */

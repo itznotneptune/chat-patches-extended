@@ -585,7 +585,7 @@ Read-only history keeps hidden messages accessible, so suspension needs no resto
 ### 7.1 Single source of truth and persistence (P14, conditionally approved, option B; mechanisms *Proposed* where marked; runtime Unverified)
 - **Files (Approved):**
   - `config/cpextended.json`: the active configuration, and the **only** persisted Extended state. No message history, hidden-message database or durable unread state is ever persisted (D3, F1, P4).
-  - `cpextended.json.bak`: the **last-good** backup used by Q36's ordinary-save fallback.
+  - `cpextended.json.bak`: the **last-good** backup. **Amended in RC.2 (decisions §1.3d-1):** every successful save promotes the replaced version when it's valid and reconciled; it also protects Q36's ordinary-save fallback. Ordering and crash generations: `docs/rc2-p14-backup.md`.
   - `cpextended.json.corrupt-<timestamp>`: a **preserved copy of an unparseable original**. This replaces the earlier `.bak-<timestamp>` naming.
   - The two backup purposes are kept distinct.
 - **States:**
@@ -606,10 +606,10 @@ Read-only history keeps hidden messages accessible, so suspension needs no resto
       - **Overwrite file with current settings:** explicit confirmation, then the normal atomic save. In-memory tabs are kept, so this can't orphan.
     - A failed reconciliation never partially applies a configuration or clears the lock.
 - **Save paths (Q36, retained):**
-  - **Atomic path:** temp file in the same directory, flushed, `ATOMIC_MOVE` replace.
+  - **Atomic path:** temp file in the same directory, flushed, `ATOMIC_MOVE` replace. RC.2: the replaced version is staged as the next backup before the replace and moved over `.bak` only after it (a failed commit leaves both files unchanged).
   - **Atomic replacement unavailable:** orphan-producing operations are **refused**.
   - **Ordinary saves** (geometry, filters, non-orphaning tab changes) use the backup-protected non-atomic fallback (*mechanism Proposed*):
-    1. copy the current file to `cpextended.json.bak`;
+    1. write the current (valid, reconciled) version to `cpextended.json.bak` and flush; a failure aborts the save;
     2. write the new content directly and flush;
     3. keep the `.bak` until the next successful save.
   - **Transient failures** (e.g. Windows file locks) get one retry, then a "not saved" message; the model stays dirty.

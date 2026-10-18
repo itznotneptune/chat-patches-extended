@@ -4,12 +4,14 @@ package io.github.itznotneptune.cpextended.gui;
 import io.github.itznotneptune.cpextended.config.ConfigEdit;
 import io.github.itznotneptune.cpextended.config.ConfigManager;
 import io.github.itznotneptune.cpextended.config.ExtendedConfig;
+import io.github.itznotneptune.cpextended.config.Labels;
 import io.github.itznotneptune.cpextended.core.Router;
 import io.github.itznotneptune.cpextended.core.SessionMirror;
 import io.github.itznotneptune.cpextended.core.TabState;
 import io.github.itznotneptune.cpextended.model.RoutingConfig;
 import io.github.itznotneptune.cpextended.ui.TabMoves;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
@@ -29,8 +31,14 @@ public final class WindowScreen extends BaseScreen {
 	private final Map<String, String> moveTargets = new HashMap<>();
 
 	public WindowScreen(Screen parent, String windowId) {
-		super(Component.translatable("cpextended.gui.window", windowId), parent);
+		super(Component.literal(title(windowId)), parent);
 		this.windowId = windowId;
+	}
+
+	/** "Window 1: Smoke, Everything" (M2); the internal id only when the window can't be found. */
+	static String title(String windowId) {
+		ExtendedConfig.Window w = ConfigManager.get().config().window(windowId);
+		return w == null ? Labels.window(windowId) : Labels.windowWithTabs(w);
 	}
 
 	ExtendedConfig.Window window() {
@@ -65,12 +73,13 @@ public final class WindowScreen extends BaseScreen {
 					.bounds(width / 2 - 154, ry, 150, 20).build());
 			open.active = tabId != null && t.config() != null;
 			String target = moveTargets.getOrDefault(String.valueOf(tabId), others.isEmpty() ? null : others.get(0));
-			Button cycle = addRenderableWidget(Button.builder(Component.literal(target == null ? "-" : "-> " + target), b -> {
+			Button cycle = addRenderableWidget(Button.builder(Component.literal(target == null ? "-" : "-> " + Labels.window(target)), b -> {
 				int k = others.indexOf(moveTargets.getOrDefault(String.valueOf(tabId), others.get(0)));
 				moveTargets.put(String.valueOf(tabId), others.get((k + 1) % others.size()));
 				rebuildWidgets();
 			}).bounds(width / 2 - 2, ry, 70, 20).build());
 			cycle.active = tabId != null && others.size() > 1;
+			if (target != null) cycle.setTooltip(Tooltip.create(Component.translatable("cpextended.gui.move_target.tooltip", title(target))));
 			Button move = addRenderableWidget(Button.builder(Component.translatable("cpextended.gui.move"), b -> {
 				String dest = moveTargets.getOrDefault(String.valueOf(tabId), others.isEmpty() ? null : others.get(0));
 				if (dest != null) report(TabMoves.moveToWindow(tabId, dest));
@@ -87,7 +96,7 @@ public final class WindowScreen extends BaseScreen {
 		addRenderableWidget(Button.builder(Component.translatable("cpextended.gui.delete_window"), b -> {
 			// P5: an empty window is deleted directly (after confirmation); a nonempty one needs a move-or-delete choice per tab
 			if (window().tabs().isEmpty()) confirm(Component.translatable("cpextended.gui.delete_window"),
-					Component.translatable("cpextended.gui.delete_window.confirm", windowId), this::deleteWindow);
+					Component.translatable("cpextended.gui.delete_window.confirm", Labels.window(windowId)), this::deleteWindow);
 			else minecraft.setScreen(new DeleteWindowScreen(this, windowId));
 		}).bounds(width / 2 - 50, height - 28, 100, 20).build());
 		addRenderableWidget(Button.builder(Component.translatable("gui.back"), b -> onClose()).bounds(width / 2 + 54, height - 28, 100, 20).build());
@@ -138,7 +147,7 @@ public final class WindowScreen extends BaseScreen {
 	void afterWindowDeletion(ConfigManager.EditOutcome o) {
 		report(o);
 		if (o.applied()) {
-			if (parent instanceof BaseScreen b) b.setStatus("Window " + windowId + " deleted", false);
+			if (parent instanceof BaseScreen b) b.setStatus(Labels.window(windowId) + " deleted", false);
 			minecraft.setScreen(parent);
 		} else {
 			minecraft.setScreen(this);

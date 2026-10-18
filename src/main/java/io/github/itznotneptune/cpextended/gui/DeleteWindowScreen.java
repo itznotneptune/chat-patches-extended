@@ -4,6 +4,7 @@ package io.github.itznotneptune.cpextended.gui;
 import io.github.itznotneptune.cpextended.config.ConfigEdit;
 import io.github.itznotneptune.cpextended.config.ConfigManager;
 import io.github.itznotneptune.cpextended.config.ExtendedConfig;
+import io.github.itznotneptune.cpextended.config.Labels;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 
@@ -24,7 +25,7 @@ public final class DeleteWindowScreen extends BaseScreen {
 	private final Map<String, String> choice = new HashMap<>();
 
 	public DeleteWindowScreen(WindowScreen owner, String windowId) {
-		super(Component.translatable("cpextended.gui.delete_window.choose", windowId), owner);
+		super(Component.translatable("cpextended.gui.delete_window.choose", Labels.window(windowId)), owner);
 		this.owner = owner;
 		this.windowId = windowId;
 	}
@@ -51,7 +52,7 @@ public final class DeleteWindowScreen extends BaseScreen {
 			String id = t.id();
 			addRenderableWidget(Button.builder(Component.literal(WindowScreen.label(t)), b -> {}).bounds(width / 2 - 154, ry, 150, 20).build()).active = false;
 			String current = choice.get(id);
-			Component label = current == null ? Component.translatable("cpextended.gui.delete") : Component.literal("-> " + current);
+			Component label = current == null ? Component.translatable("cpextended.gui.delete") : Component.literal("-> " + Labels.window(current));
 			addRenderableWidget(Button.builder(label, b -> {
 				// cycle: delete -> each destination -> delete
 				String c = choice.get(id);

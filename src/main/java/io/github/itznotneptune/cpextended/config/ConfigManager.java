@@ -64,6 +64,7 @@ public final class ConfigManager {
 	private @Nullable Path corruptCopy;
 	private boolean runningOnBackup;
 	private SaveOutcome lastSave;
+	private ConfigStorage.@Nullable BackupOutcome lastBackup;
 
 	private ConfigManager(ConfigStorage storage) {
 		this.storage = storage;
@@ -86,6 +87,8 @@ public final class ConfigManager {
 	public @Nullable Path corruptCopy() { return corruptCopy; }
 	public boolean runningOnBackup() { return runningOnBackup; }
 	public @Nullable SaveOutcome lastSave() { return lastSave; }
+	/** What the last write did with {@code .bak} (P14 amendment), for diagnostics and tests. */
+	public ConfigStorage.@Nullable BackupOutcome lastBackup() { return lastBackup; }
 	public int pendingEdits() { return pending.size(); }
 
 	// ---------------------------------------------------------------- startup
@@ -170,7 +173,7 @@ public final class ConfigManager {
 		ExtendedConfig next = ConfigParser.interpret(copy).config();
 		List<String> orphans = OrphanGuard.orphaningTabs(config, next);
 		if (!orphans.isEmpty()) {
-			return new EditOutcome(ConfigEdit.Result.rejected(needsConfirmation(orphans)), null);
+			return new EditOutcome(ConfigEdit.Result.rejected(needsConfirmation(config, orphans)), null);
 		}
 		use(next);
 		pending.add(e);
@@ -195,7 +198,7 @@ public final class ConfigManager {
 		ExtendedConfig next = ConfigParser.interpret(copy).config();
 		List<String> orphans = OrphanGuard.orphaningTabs(config, next);
 		if (!orphans.isEmpty()) {
-			return new EditOutcome(ConfigEdit.Result.rejected(needsConfirmation(orphans)), null);
+			return new EditOutcome(ConfigEdit.Result.rejected(needsConfirmation(config, orphans)), null);
 		}
 		use(next);
 		pending.addAll(edits);
@@ -246,7 +249,9 @@ public final class ConfigManager {
 		if (state == State.DIVERGENCE) return SaveOutcome.BLOCKED_DIVERGENCE;
 		if (!write) return adopted ? SaveOutcome.APPLIED_EXTERNAL_EDIT : SaveOutcome.NOTHING_TO_SAVE;
 		if (!dirty) return SaveOutcome.NOTHING_TO_SAVE;
-		ConfigStorage.SaveResult r = storage.save(ConfigWriter.toBytes(config.raw()), baseline);
+		// NORMAL state and the content check passed: the baseline is a reconciled version, so it may become the last-good backup.
+		ConfigStorage.SaveResult r = storage.save(ConfigWriter.toBytes(config.raw()), baseline, true);
+		lastBackup = r.backup();
 		switch (r.status()) {
 			case SAVED_ATOMIC, SAVED_FALLBACK -> {
 				baseline = r.written();
@@ -309,7 +314,7 @@ public final class ConfigManager {
 		List<String> orphans = OrphanGuard.orphaningTabs(config, p.config());
 		if (!orphans.isEmpty()) {
 			divergedFingerprint = fp;
-			enter(State.DIVERGENCE, "cpextended.json was edited to remove tabs holding hidden messages " + orphans
+			enter(State.DIVERGENCE, "cpextended.json was edited to remove tabs holding hidden messages (" + Labels.tabs(config, orphans) + ")"
 					+ "; that needs your confirmation (Apply file moves them back to the main chat), so the edit isn't applied yet");
 			return SaveOutcome.BLOCKED_DIVERGENCE;
 		}
@@ -360,7 +365,7 @@ public final class ConfigManager {
 		}
 		List<String> orphans = OrphanGuard.orphaningTabs(config, next);
 		if (!orphans.isEmpty()) {
-			return new ActionResult(false, needsConfirmation(orphans));
+			return new ActionResult(false, needsConfirmation(config, orphans));
 		}
 		use(next);
 		baseline = now.fingerprint();
@@ -379,7 +384,9 @@ public final class ConfigManager {
 		if (state != State.DIVERGENCE) return new ActionResult(false, "not in a divergence lock");
 		if (!confirmed) return new ActionResult(false, "confirmation required");
 		ConfigStorage.Fingerprint expected = divergedFingerprint == null ? baseline : divergedFingerprint;
-		ConfigStorage.SaveResult r = storage.save(ConfigWriter.toBytes(config.raw()), expected);
+		// The file holds an unreconciled external edit: it never becomes the backup.
+		ConfigStorage.SaveResult r = storage.save(ConfigWriter.toBytes(config.raw()), expected, false);
+		lastBackup = r.backup();
 		if (r.written() == null) {
 			if (r.status() == ConfigStorage.SaveStatus.CHANGED_ON_DISK) {
 				divergedFingerprint = storage.read().fingerprint();
@@ -402,12 +409,11 @@ public final class ConfigManager {
 	public synchronized ActionResult restoreFromBackup(boolean confirmed) {
 		if (state != State.NO_SAVE) return new ActionResult(false, "not in the no-save state");
 		if (!confirmed) return new ActionResult(false, "confirmation required");
-		ConfigStorage.Read bak = storage.readBackup();
-		if (bak.bytes() == null) return new ActionResult(false, "no readable " + storage.backup().getFileName());
+		ConfigStorage.BackupInfo bak = storage.inspectBackup();
+		if (bak.state() != ConfigStorage.BackupState.VALID) return new ActionResult(false, backupUnusable(bak));
 		ConfigParser.Result p = ConfigParser.parse(bak.bytes());
-		if (p.status() != ConfigParser.Status.OK) return new ActionResult(false, storage.backup().getFileName() + " isn't valid either");
 		List<String> orphans = OrphanGuard.orphaningTabs(config, p.config());
-		if (!orphans.isEmpty()) return new ActionResult(false, needsConfirmation(orphans));
+		if (!orphans.isEmpty()) return new ActionResult(false, needsConfirmation(config, orphans));
 		ActionResult w = replacePrimary(bak.bytes());
 		if (!w.ok()) return w;
 		use(p.config());
@@ -429,7 +435,9 @@ public final class ConfigManager {
 	}
 
 	private ActionResult replacePrimary(byte[] bytes) {
-		ConfigStorage.SaveResult r = storage.save(bytes, baseline);
+		// No-save state: the file being replaced is corrupt, unsupported or unreadable, so the existing backup is kept.
+		ConfigStorage.SaveResult r = storage.save(bytes, baseline, false);
+		lastBackup = r.backup();
 		if (r.written() == null) {
 			if (r.status() == ConfigStorage.SaveStatus.CHANGED_ON_DISK) {
 				// The player edited the file meanwhile: treat it as a possible repair instead of overwriting it.
@@ -449,22 +457,24 @@ public final class ConfigManager {
 	// ---------------------------------------------------------------- orphan restoration (Q2, Q22, Q27, P5, P6, C-1, Q36)
 
 	/** What an orphan-producing change would do, for the confirmation (Q22 disclosure), or why it's refused. */
-	public record OrphanCheck(boolean orphaning, @Nullable String refusal, int restored, int pruned, List<String> tabs) {
-		static final OrphanCheck NONE = new OrphanCheck(false, null, 0, 0, List.of());
+	public record OrphanCheck(boolean orphaning, @Nullable String refusal, int restored, int pruned, List<String> tabs, String tabNames) {
+		static final OrphanCheck NONE = new OrphanCheck(false, null, 0, 0, List.of(), "");
 		public boolean refused() { return refusal != null; }
 	}
 
-	private static String needsConfirmation(List<String> orphans) {
-		return "deleting " + orphans + " would leave hidden messages with no tab; that needs the confirmation that moves them back to the main chat"
+	private static String needsConfirmation(ExtendedConfig from, List<String> orphans) {
+		return "deleting " + Labels.tabs(from, orphans) + " would leave hidden messages with no tab; that needs the confirmation that moves them back to the main chat"
 				+ " (nothing was changed). " + OrphanRestore.KEEP_DISABLE_MOVE;
 	}
 
 	private OrphanCheck check(ExtendedConfig next) {
-		OrphanRestore.Outcome o = OrphanRestore.plan(OrphanGuard.tabIds(config), OrphanGuard.tabIds(next));
+		ExtendedConfig from = config;
+		OrphanRestore.Outcome o = OrphanRestore.plan(OrphanGuard.tabIds(config), OrphanGuard.tabIds(next), ids -> Labels.tabs(from, ids));
 		return switch (o) {
 			case OrphanRestore.NoOrphans n -> OrphanCheck.NONE;
-			case OrphanRestore.Refused r -> new OrphanCheck(true, r.message(), 0, 0, List.of());
-			case OrphanRestore.Ready rd -> new OrphanCheck(true, null, rd.plan().restoredCount(), rd.plan().prunedCount(), List.copyOf(rd.plan().tabsWithOrphans()));
+			case OrphanRestore.Refused r -> new OrphanCheck(true, r.message(), 0, 0, List.of(), "");
+			case OrphanRestore.Ready rd -> new OrphanCheck(true, null, rd.plan().restoredCount(), rd.plan().prunedCount(), List.copyOf(rd.plan().tabsWithOrphans()),
+					Labels.tabs(from, rd.plan().tabsWithOrphans()));
 		};
 	}
 
@@ -484,7 +494,7 @@ public final class ConfigManager {
 	public synchronized OrphanCheck checkEdits(List<ConfigEdit> edits) {
 		ConfigEdit.Result[] failure = new ConfigEdit.Result[1];
 		ExtendedConfig next = applied(edits, failure);
-		if (next == null) return new OrphanCheck(false, String.valueOf(failure[0].reason()), 0, 0, List.of());
+		if (next == null) return new OrphanCheck(false, String.valueOf(failure[0].reason()), 0, 0, List.of(), "");
 		return check(next);
 	}
 
@@ -526,6 +536,18 @@ public final class ConfigManager {
 		return new ActionResult(true, "file applied; hidden messages moved back to the main chat");
 	}
 
+	/** Why {@code .bak} can't be restored, for the player; null when it can. */
+	public @Nullable String backupUnusable(ConfigStorage.BackupInfo b) {
+		String name = storage.backup().getFileName().toString();
+		return switch (b.state()) {
+			case VALID -> null;
+			case MISSING -> "There is no " + name + " yet: a backup of the previous settings is kept after the first change saved in game";
+			case UNREADABLE -> name + " can't be read (" + b.detail() + ")";
+			case UNPARSEABLE -> name + " is damaged too (" + b.detail() + "), so it can't be restored";
+			case UNSUPPORTED_SCHEMA -> name + " has " + b.detail() + " and can't be restored by this version";
+		};
+	}
+
 	/** No-save: the counts Restore from backup would disclose (or its refusal). */
 	public synchronized OrphanCheck checkRestoreFromBackup() {
 		ConfigStorage.Read bak = storage.readBackup();
@@ -537,10 +559,9 @@ public final class ConfigManager {
 	/** No-save: Restore from backup that moves orphaned hidden messages back, after confirmation. */
 	public synchronized ActionResult restoreFromBackupRestoringOrphans(OrphanCheck disclosed) {
 		if (state != State.NO_SAVE) return new ActionResult(false, "not in the no-save state");
-		ConfigStorage.Read bak = storage.readBackup();
-		if (bak.bytes() == null) return new ActionResult(false, "no readable " + storage.backup().getFileName());
+		ConfigStorage.BackupInfo bak = storage.inspectBackup();
+		if (bak.state() != ConfigStorage.BackupState.VALID) return new ActionResult(false, backupUnusable(bak));
 		ConfigParser.Result p = ConfigParser.parse(bak.bytes());
-		if (p.status() != ConfigParser.Status.OK) return new ActionResult(false, storage.backup().getFileName() + " isn't valid either");
 		if (!baselineKnown) return new ActionResult(false, "cpextended.json couldn't be read at startup, so it can't be replaced safely while hidden messages depend on it");
 		String refusal = transact(p.config(), disclosed, null, bak.bytes());
 		if (refusal == NOT_ORPHANING) return restoreFromBackup(true);
@@ -573,7 +594,8 @@ public final class ConfigManager {
 		if (adoptOnDisk == null && state == State.DIVERGENCE) return "saving is blocked by the divergence lock (" + stateDetail + "); nothing was changed";
 		if (adoptOnDisk == null && bytes == null && state == State.NO_SAVE) return "saving is disabled (" + stateDetail + "); nothing was changed";
 		if (adoptOnDisk == null && !baselineKnown) return "cpextended.json couldn't be read, so it can't be replaced safely; nothing was changed";
-		OrphanRestore.Outcome o = OrphanRestore.plan(OrphanGuard.tabIds(config), OrphanGuard.tabIds(next));
+		ExtendedConfig from = config;
+		OrphanRestore.Outcome o = OrphanRestore.plan(OrphanGuard.tabIds(config), OrphanGuard.tabIds(next), ids -> Labels.tabs(from, ids));
 		if (o instanceof OrphanRestore.NoOrphans) return NOT_ORPHANING;
 		if (o instanceof OrphanRestore.Refused r) return r.message();
 		OrphanRestore.Plan plan = ((OrphanRestore.Ready) o).plan();
@@ -587,7 +609,7 @@ public final class ConfigManager {
 		ConfigStorage.Prepared[] prepared = new ConfigStorage.Prepared[1];
 		ConfigStorage.Fingerprint[] written = new ConfigStorage.Fingerprint[1];
 		if (adoptOnDisk == null) {
-			ConfigStorage.PrepareResult pr = storage.prepareAtomic(bytes != null ? bytes : ConfigWriter.toBytes(next.raw()), baseline);
+			ConfigStorage.PrepareResult pr = storage.prepareAtomic(bytes != null ? bytes : ConfigWriter.toBytes(next.raw()), baseline, state == State.NORMAL);
 			switch (pr.status()) {
 				case OK -> prepared[0] = pr.prepared();
 				case ATOMIC_UNSUPPORTED -> {
@@ -623,9 +645,11 @@ public final class ConfigManager {
 			};
 		});
 		if (!cr.committed()) {
-			storage.abort(prepared[0]);
+			storage.abort(prepared[0]); // the staged backup too: both files are unchanged
 			return cr.message() + "; nothing was changed";
 		}
+		// Post-commit, outside the rollback scope: a failed backup update keeps the older backup, never undoes the commit.
+		if (prepared[0] != null) lastBackup = storage.finalizeBackup(prepared[0]);
 		baseline = written[0];
 		baselineKnown = true;
 		pending.clear();

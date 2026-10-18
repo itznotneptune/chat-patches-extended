@@ -82,7 +82,7 @@ abstract class BaseScreen extends Screen {
 			else setStatus("Nothing was changed", false);
 		}, Component.translatable("cpextended.gui.orphans.title"),
 				Component.translatable(c.pruned() > 0 ? "cpextended.gui.orphans.message_pruned" : "cpextended.gui.orphans.message",
-						c.restored(), String.join(", ", c.tabs()), c.pruned())));
+						c.restored(), c.tabNames(), c.pruned())));
 	}
 
 	protected void setStatus(String text, boolean error) {

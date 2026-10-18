@@ -326,6 +326,13 @@ Types: **P** positive · **N** negative · **E** edge · **F** failure path. Eve
 | V-13 | E | Flood 16,384+ messages, 10 tabs, mixed hiding; **5+ large visible windows** with cached line wrapping, during gameplay and with chat open; **plus** an active plain-text search across 10 tabs with high arrival rates (e.g. 50 msg/s), and rapid query typing | No frame drops attributable to routing, liveness, rendering or search (per-frame time recorded); search match caches update incrementally on arrival (allocation per arrival recorded and bounded); memory ≈ references plus line and match caches; caches rebuilt only on query, setting, width or scale changes | 8 |
 | V-26 | E | Regex cost scaling (chosen engine): fixed pattern, message length 256 → 32,768 | Roughly linear growth; documented ms per 1,000 characters | Deferred (Q15) |
 
+### 3.7 RC.2 (P14 last-good backup amendment, S2, S3, M1-M4)
+| ID | Kind | Scenario | Expected | Mode |
+|---|---|---|---|---|
+| RC2.B1-B18 | F | Backup generations: creation, first save without a previous valid file, repeated atomic saves, exact previous bytes, corruption and GUI recovery, invalid/missing/newer/unreadable backups, raw preservation, hand edits and divergence, backup staging/finalize failure, active replace failure, Q36 success/rollback/post-commit backup failure, restore that orphans, restore refused by the projection, fallback saves, no unsafe promotion, no session mutation | As in `docs/rc2-p14-backup.md`: `.bak` is always a previous valid reconciled version (or the older one), a failed commit leaves both files unchanged, refusals change nothing | `rc2_backup` |
+| RC2.B11.kill.* | F | `Runtime.halt` at 12 points of ordinary, fallback and Q36 saves, then a relaunch | The surviving generations match the crash table; startup state and recovery path as documented | `rc2_kill_<point>` + `rc2_kill_check` |
+| RC2.S2, S3, M1-M4 | GUI | Tab names in every safety dialog (duplicates and unnamed with ids), case tooltip with mouse and keyboard, label fit at scales 1-4 and narrow windows, derived window labels, banner layout and Details, empty state | No ids where a name exists; semantics unchanged; no overlaps or clipped target labels | `rc2_gui` |
+
 ## 4. Compatibility procedure for a new Chat Patches release (D11 / Q5)
 
 1. Diff the tested and new Chat Patches tags. Check `ChatComponentMixin`, `ChatScreenMixin`, `ScreenMixin`, `ChatUtil`, `ChatLog`, `Boundary`, `Config`, `accessor/*`, `ContextMenu`, `fabric.mod.json`.

@@ -70,6 +70,7 @@ When you join a world after starting the game, Chat Patches restores its saved c
 - Chat Patches' timestamp and duplicate counter are ignored for matching.
 - The message text, including saved name formatting, is matched as it was saved.
 - Messages in an unrecognized format still go to matching tabs but are never hidden.
+- **Restored messages are routed by the tabs as they are now.** A message that stayed visible in the main chat when it first arrived (for example while hiding was off, or before a tab existed) can be hidden after a restart, when a tab with **Restored history** and **Hide from main chat** matches it. The reverse also happens: a message hidden last session comes back visible if no hiding tab restores it. Chat Patches' log is the only source; Extended never saved which messages were hidden.
 
 ## Search
 Chat Patches' search field (in the chat screen) also filters every window, each in its own tab history.
@@ -79,10 +80,14 @@ Chat Patches' search field (in the chat screen) also filters every window, each 
 
 ## Settings file, backups and recovery
 - **Files:**
-  - `config/cpextended.json`: the settings. It's safe to edit by hand; the game detects edits by content.
-  - `config/cpextended.json.bak`: the previous version.
+  - `config/cpextended.json`: the settings in use. It's safe to edit by hand; the game detects edits by content.
+  - `config/cpextended.json.bak`: the **last-good backup**, your settings as they were **before the most recent change saved in game**. Each successful save moves the version it replaces into `.bak`, byte for byte (hand edits and unknown entries included).
   - `config/cpextended.json.corrupt-<time>`: a copy of a file that couldn't be read.
-- If the file **can't be used** (broken, or from a newer version), saving is disabled and the settings screen offers **Restore from backup** or **Replace file**, each after confirmation.
+- **When the backup is updated:** only when the version being replaced is valid and is the one the game loaded or saved (or a hand edit it already applied). A broken file, a file from a newer version, or an outside edit the game hasn't applied never becomes the backup; the older backup is kept instead. There's no backup before your first saved change, and none if you only ever edited the file by hand.
+- If the file **can't be used** (broken, or from a newer version), saving is disabled and the settings run read-only (from a valid backup if there is one). The settings screen offers, each after confirmation:
+  - **Restore from backup**: writes `.bak` back as `cpextended.json` and uses it. The backup is checked first; if it's missing, damaged or from a newer version, the button is unavailable and says why. Deleting tabs through a restore follows the same hidden-message rules as deleting them by hand (confirmation, or refusal).
+  - **Replace file**: writes the settings currently in use as `cpextended.json`.
+- **What the backup doesn't cover:** it's one generation old and contains settings only (never messages). After a crash or failure at the wrong moment it may be one generation older than expected, and a power loss or file-system fault can undo a recent save. It's a recovery aid, not a guarantee.
 - If the file was **changed outside the game** in a way that can't be applied, saving is blocked until you choose **Apply file** or **Overwrite file**.
 - Messages are never written to this file. Only settings are.
 - **Known limitation:** if another program writes the file in the fraction of a millisecond between Extended's last check and its save, that external change is overwritten.

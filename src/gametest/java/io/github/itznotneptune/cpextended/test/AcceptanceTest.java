@@ -97,7 +97,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 				case "keys" -> new Phase4Tests(this).keys();
 				case "scales" -> new Phase4Tests(this).scales();
 				case "search" -> new Phase5Tests(this).search();
-				case "searchperf" -> new Phase5Tests(this).searchperf();
+				case "searchperf" -> new Phase5Tests(this).searchperf(false);
 				case "restore_seed" -> new Phase6Tests(this).restoreSeed();
 				case "restore6" -> new Phase6Tests(this).restore6();
 				case "q36" -> new Phase7aTests(this).q36();
@@ -106,9 +106,16 @@ public final class AcceptanceTest implements FabricClientGameTest {
 				case "q36_kill_between" -> new Phase7aTests(this).q36Kill("betweenSwapAndRename");
 				case "q36_kill_after" -> new Phase7aTests(this).q36Kill("afterReplace");
 				case "q36_kill_check" -> new Phase7aTests(this).q36KillCheck();
+				case "hide" -> new Phase7bTests(this).hideMode();
+				case "hideperf" -> new Phase5Tests(this).searchperf(true);
+				case "hide_seed" -> new Phase7bTests(this).hideSeed(true);
+				case "hide_relaunch" -> new Phase7bTests(this).hideRelaunch(true);
+				case "hide_relaunch2" -> new Phase7bTests(this).hideRelaunch(false);
+				case "hide_seed_nolog" -> new Phase7bTests(this).hideSeed(false);
+				case "hide_relaunch_nolog" -> new Phase7bTests(this).hideRelaunch(false);
 				case "extras" -> new ExtrasTests(this).extras();
 				case "conflict_bool", "conflict_int", "conflict_error" -> conflict();
-				case "structural_off", "structural_base", "structural_tabs" -> structural();
+				case "structural_off", "structural_base", "structural_tabs", "structural_hide" -> structural();
 				default -> ev.data("error", "msg", "unknown mode " + mode);
 			}
 		} catch (Throwable t) {
@@ -1018,6 +1025,9 @@ public final class AcceptanceTest implements FabricClientGameTest {
 	void structural() throws Exception {
 		boolean off = mode.equals("structural_off");
 		if (mode.equals("structural_tabs")) install(config(matchAll("s-all"), tab("s-tok", "cpx#")));
+		// hiding-on baseline (Phase 7): two of the messages are hidden; the main chat must differ by exactly those, the log not at all
+		if (mode.equals("structural_hide")) install(config(matchAll("s-all"),
+				new TabConfig("s-hide", "s-hide", true, true, true, false, List.of(FilterSpec.literal("cpx#SM-3"), FilterSpec.literal("cpx#SM-5")), List.of())));
 		Map<String, Object> state = new LinkedHashMap<>();
 		state.put("devDisabled", DevHooks.disabled());
 		state.put("diagnosticsEnabled", Diagnostics.ENABLED);
@@ -1042,9 +1052,12 @@ public final class AcceptanceTest implements FabricClientGameTest {
 				}
 				return out;
 			});
-			if (mode.equals("structural_tabs")) {
+			if (mode.equals("structural_tabs") || mode.equals("structural_hide")) {
 				int routed = tabEntries("s-all").size();
 				state.put("routedToAllTab", routed);
+			}
+			if (mode.equals("structural_hide")) {
+				state.put("hiddenRecords", ctx.computeOnClient(c -> SessionMirror.get().hiddenRecords().stream().map(r -> r.original().getString()).toList()));
 			}
 			state.put("chatLogCount", ctx.computeOnClient(c -> ChatLog.messageCount()));
 		}

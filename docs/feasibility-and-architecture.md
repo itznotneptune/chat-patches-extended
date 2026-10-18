@@ -256,6 +256,8 @@ A message is **hidden** iff all of the following hold:
 4. It isn't a boundary line (Q10).
 5. Chat Patches didn't condense a visible duplicate during this call (Q3; detection §5.2).
 
+*Implementation (Phase 7 Stage B):* `Router.decide` computes the decision after evaluating every tab (P9: a throwing tab is excluded); `Capture` takes the Q3/P3 dual-signal snapshot at M1 entry only when some tab could hide (`RoutingConfig.anyHidingTab`) and `condensationDetected` compares size and newest-entry identities at decision time; `SessionMirror.enforceHiddenCap` applies P7 at each hidden insertion; a frame decided hidden but abandoned before delivery is delivered to its tabs by the reconciler. Verified: `verification/phase7/`.
+
 Properties:
 - **Deterministic.** F1, Chat Visibility, fade, selection, search and position **never** affect the decision (Q24, Q29a).
 - **Not retroactive**, except for Q2 restoration.

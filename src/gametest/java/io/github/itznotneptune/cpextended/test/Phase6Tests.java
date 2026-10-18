@@ -198,7 +198,9 @@ final class Phase6Tests {
 
 	String config(String name) {
 		String q = "\"";
-		return "{\n\"schemaVersion\": 1,\n\"general\": {\"enabled\": true, \"hidingEnabled\": true},\n"
+		// Phase 7: hiding is real now; Phase 6's checks are about routing and display with nothing hidden, so the global
+		// switch is off here (rTok keeps hideFromMainChat to show the switch wins). Restored messages under real hiding: hide_relaunch*.
+		return "{\n\"schemaVersion\": 1,\n\"general\": {\"enabled\": true, \"hidingEnabled\": false},\n"
 				+ "\"windows\": [\n"
 				+ " {\"id\": \"r-main\", \"anchor\": \"TOP_RIGHT\", \"x\": 0.02, \"y\": 0.02, \"width\": 0.45, \"height\": 0.30, \"selectedTab\": \"rAll\", \"tabs\": ["
 				+ "{\"id\": \"rAll\", \"matchAll\": true, \"restoreHistory\": true},"

@@ -32,7 +32,9 @@ public final class Capture {
 				return false;
 			}
 			ArrayDeque<CaptureFrame> frames = STACK.get();
-			frames.push(new CaptureFrame(message, tag, classify(tag), frames.size() + 1));
+			CaptureFrame f = new CaptureFrame(message, tag, classify(tag), frames.size() + 1);
+			if (Router.get().config().anyHidingTab()) snapshot(chat, f);
+			frames.push(f);
 			return true;
 		} catch (RuntimeException e) {
 			internalError("enter", e);
@@ -141,6 +143,39 @@ public final class Capture {
 		if (admissions >= 2) admitMessages(g);
 		allMessages(chat).add(0, g);
 		return g;
+	}
+
+	/**
+	 * Q3/P3 dual-signal snapshot, taken before Chat Patches processes the message: the main chat's size and the newest
+	 * entries covering the full duplicate-search window (computed through the adapter, a conservative superset when its
+	 * settings are unusual or unreadable), bounded by the number of existing entries.
+	 */
+	private static void snapshot(ChatComponent chat, CaptureFrame f) {
+		List<GuiMessage> all = allMessages(chat);
+		int k = ChatPatchesAdapter.get().condenseWindow(all.size(), chat.getLinesPerPage());
+		k = Math.min(k, all.size());
+		f.sizeAtEnter = all.size();
+		GuiMessage[] snap = new GuiMessage[Math.max(0, k)];
+		for (int i = 0; i < snap.length; i++) snap[i] = all.get(i);
+		f.snapshot = snap;
+	}
+
+	/**
+	 * Whether Chat Patches removed a visible entry during this call (it condenses a duplicate by removing the earlier
+	 * copy before the new message is admitted, S6): the list shrank, or an entry of the snapshot is gone (identity, not
+	 * text). Duplicate-counter data is never used for this.
+	 */
+	static boolean condensationDetected(CaptureFrame f) {
+		if (f.snapshot == null) return false;
+		List<GuiMessage> all = allMessages(Minecraft.getInstance().gui.getChat());
+		if (all.size() < f.sizeAtEnter) return true;
+		int window = Math.min(all.size(), f.snapshot.length + 1);
+		outer:
+		for (GuiMessage g : f.snapshot) {
+			for (int i = 0; i < window; i++) if (all.get(i) == g) continue outer;
+			return true;
+		}
+		return false;
 	}
 
 	/** Depth of the current frame stack (0 outside {@code addMessage}). */

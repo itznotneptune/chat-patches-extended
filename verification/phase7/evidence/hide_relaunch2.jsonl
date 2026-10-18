@@ -1,0 +1,2 @@
+{"t":"mode","mode":"hide_relaunch2","time":"2026-10-18T16:47:46.191821Z","diagnosticsEnabled":true,"devDisabled":false}
+{"t":"result","mode":"hide_relaunch2","test":"Q16b.restoredUnderHiding","outcome":"PASS","ambiguousRestored":8,"ambiguousHidden":0,"recognizedRestoredHidden":41,"note":"restored history in a hiding tab with restoreHistory: recognized messages are hidden (§4.6), unrecognized (AMBIGUOUS) ones never (Q16b)"}

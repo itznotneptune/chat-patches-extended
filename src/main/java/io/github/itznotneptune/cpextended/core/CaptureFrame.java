@@ -18,6 +18,9 @@ final class CaptureFrame {
 	@Nullable String matchText;
 	/** Why a restored message's structure wasn't recognized (P2), or null. */
 	@Nullable String reconstructionNote;
+	/** Q3/P3: main-chat size and the newest entries (identity) when the call began, if hiding was possible; else null. */
+	@Nullable GuiMessage[] snapshot;
+	int sizeAtEnter;
 	boolean delivered;
 	boolean failed;
 	int displayAdmissions;

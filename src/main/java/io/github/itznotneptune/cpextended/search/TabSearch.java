@@ -31,7 +31,8 @@ import java.util.Set;
  * <li>plain text: Chat Patches' semantics (S24): {@code stripFormatting(content)} contains the query, case per
  * {@code caseSensitive}. Evaluated by Extended; new arrivals are checked incrementally against the current query;</li>
  * <li>regex mode (Q31): an entry matches only if Chat Patches' own result list holds its message (identity). Extended
- * never runs a regex. Entries Chat Patches didn't evaluate (later arrivals) are reported as partial results;</li>
+ * never runs a regex. Entries Chat Patches didn't evaluate (later arrivals, and hidden entries, which aren't in its
+ * main chat) are reported as partial results;</li>
  * <li>zero matches: the tab's full history if {@code searchEmptyShowsFullChat}, else an empty view with "No matches".</li>
  * <li>invalid regex (Chat Patches' {@code searchError}, P12 amendment): like Chat Patches' own chat, every tab shows its
  * full history, marked "Invalid search expression"; Chat Patches' stale result list is never used as matches.</li>
@@ -142,7 +143,8 @@ public final class TabSearch {
 			extend(c, s, tab, all);
 		}
 		// Regex mode: entries Chat Patches never evaluated (later arrivals) make the result partial (Q31).
-		boolean unevaluated = s.regex() && !all.isEmpty() && all.get(all.size() - 1).seq() > evaluatedUpTo;
+		// ... and hidden entries: Chat Patches' result list never includes them (Q31).
+		boolean unevaluated = s.regex() && !all.isEmpty() && (all.get(all.size() - 1).seq() > evaluatedUpTo || tab != null && tab.hiddenCount() > 0);
 		if (c.matches.isEmpty()) {
 			if (s.emptyShowsFull()) return new View(true, all, Indicator.NONE);
 			return new View(true, List.of(), unevaluated ? Indicator.PARTIAL : Indicator.NO_MATCHES);

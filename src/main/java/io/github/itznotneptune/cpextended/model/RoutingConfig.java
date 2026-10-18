@@ -43,13 +43,24 @@ public final class RoutingConfig {
 
 	private final List<WindowConfig> windows;
 	private final List<CompiledTab> tabs;
+	private final boolean hidingEnabled;
+	private final Set<String> enabledWindows;
 
-	private RoutingConfig(List<WindowConfig> windows, List<CompiledTab> tabs) {
+	private RoutingConfig(List<WindowConfig> windows, List<CompiledTab> tabs, boolean hidingEnabled) {
 		this.windows = windows;
 		this.tabs = tabs;
+		this.hidingEnabled = hidingEnabled;
+		Set<String> en = new HashSet<>();
+		for (WindowConfig w : windows) if (w.enabled()) en.add(w.id());
+		this.enabledWindows = Set.copyOf(en);
 	}
 
 	public static RoutingConfig of(List<WindowConfig> windows) {
+		return of(windows, true);
+	}
+
+	/** {@code hidingEnabled} is the global switch ({@code general.hidingEnabled}); off, nothing is hidden (§4.6). */
+	public static RoutingConfig of(List<WindowConfig> windows, boolean hidingEnabled) {
 		List<CompiledTab> tabs = new ArrayList<>();
 		Set<String> tabIds = new HashSet<>();
 		Set<String> windowIds = new HashSet<>();
@@ -64,7 +75,7 @@ public final class RoutingConfig {
 				tabs.add(new CompiledTab(t, w.id(), errors.isEmpty() ? inc : List.of(), errors.isEmpty() ? exc : List.of(), List.copyOf(errors)));
 			}
 		}
-		return new RoutingConfig(List.copyOf(windows), List.copyOf(tabs));
+		return new RoutingConfig(List.copyOf(windows), List.copyOf(tabs), hidingEnabled);
 	}
 
 	private static List<Matcher> compile(TabConfig tab, List<FilterSpec> specs, String kind, List<String> errors) {
@@ -82,6 +93,15 @@ public final class RoutingConfig {
 	}
 
 	public List<WindowConfig> windows() { return windows; }
+	public boolean hidingEnabled() { return hidingEnabled; }
+	public boolean windowEnabled(String windowId) { return enabledWindows.contains(windowId); }
+
+	/** Whether any tab could hide at all (Q3 snapshot only taken then). */
+	public boolean anyHidingTab() {
+		if (!hidingEnabled) return false;
+		for (CompiledTab t : tabs) if (t.config().hideFromMainChat() && t.config().enabled() && !t.suspended() && windowEnabled(t.windowId())) return true;
+		return false;
+	}
 	public List<CompiledTab> tabs() { return tabs; }
 
 	public Map<String, List<String>> configErrorSummary() {

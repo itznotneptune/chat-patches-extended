@@ -38,5 +38,19 @@ for m in MODES[1:]:
     report[m] = {"mainChatEntries": len(main), "mainChatIdentical": same_main, "firstMainDiff": first_diff,
                  "chatlogIdentical": same_log, "chatlogBytes": len(log or "")}
 report["structural_off"] = {"mainChatEntries": len(base_main), "chatlogBytes": len(base_log or "")}
-print(json.dumps({"test": "structural.mainChatAndChatlogUnchanged", "outcome": "PASS" if ok else "FAIL", "details": report}, indent=2))
+print(json.dumps({"test": "structural.mainChatAndChatlogUnchanged", "outcome": "PASS" if ok else "FAIL", "details": report}))
+
+# Hiding-on baseline (Phase 7), separate from the no-hiding comparison: the main chat equals the hiding-off main chat
+# minus exactly the hidden messages (cpx#SM-3, cpx#SM-5), in the same order; Chat Patches' log is identical (hidden
+# messages are still logged, D2).
+if (d / "structural_hide-mainchat.txt").exists():
+    hmain, hlog = load("structural_hide")
+    hidden = ("cpx#SM-3", "cpx#SM-5")
+    expected = [x for x in base_main if not any(h in x for h in hidden)]
+    removed = [x for x in base_main if any(h in x for h in hidden)]
+    hok = hmain == expected and hlog == base_log and len(removed) == 2
+    print(json.dumps({"test": "structural.hidingOnBaseline", "outcome": "PASS" if hok else "FAIL",
+                      "details": {"mainChatEntries": len(hmain), "expectedEntries": len(expected), "mainChatIsBaselineMinusHidden": hmain == expected,
+                                  "hiddenRemovedFromMainChat": len(removed), "chatlogIdentical": hlog == base_log}}))
+    ok &= hok
 sys.exit(0 if ok else 1)

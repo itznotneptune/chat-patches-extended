@@ -15,8 +15,11 @@ for f in sorted(d.glob("*.jsonl")):
             rows.append((f.stem, "ERROR", "FAIL", json.dumps(e, ensure_ascii=False)))
 cmp_path = d / "structural-compare.json"
 if cmp_path.exists():
-    c = json.loads(cmp_path.read_text())
-    rows.append(("structural_*", c["test"], c["outcome"], json.dumps(c["details"])))
+    for line in cmp_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        c = json.loads(line)
+        rows.append(("structural_*", c["test"], c["outcome"], json.dumps(c["details"])))
 meta_path = d / "metadata-check.json"
 if meta_path.exists():
     for line in meta_path.read_text().splitlines():

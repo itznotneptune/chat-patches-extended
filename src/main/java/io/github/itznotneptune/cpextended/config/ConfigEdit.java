@@ -30,6 +30,20 @@ public sealed interface ConfigEdit {
 	/** Geometry edits are saved with the debounce (§7.1). */
 	default boolean debounced() { return false; }
 
+	// ---------------------------------------------------------------- general
+
+	/** The global hiding switch ({@code general.hidingEnabled}). Turning it off never orphans (§4.9): hidden messages stay in their tabs. */
+	record SetHidingEnabled(boolean enabled) implements ConfigEdit {
+		public Result apply(JsonObject root, ExtendedConfig view) {
+			JsonElement g = root.get("general");
+			if (g != null && !g.isJsonObject()) return Result.rejected("general is not an object in the file; edit the file to fix it");
+			JsonObject general = g == null ? new JsonObject() : g.getAsJsonObject();
+			general.addProperty("hidingEnabled", enabled);
+			root.add("general", general);
+			return Result.OK;
+		}
+	}
+
 	// ---------------------------------------------------------------- window edits
 
 	record SetGeometry(String windowId, double x, double y, double width, double height) implements ConfigEdit {

@@ -11,7 +11,7 @@ echo "== build"; ./gradlew build --console=plain > "$logs/build.log" 2>&1; echo 
 ./gradlew dependencies --configuration compileClasspath --console=plain -q > "$logs/compileClasspath.txt" 2>&1
 
 echo "== structural"
-for m in structural_off structural_base structural_tabs; do
+for m in structural_off structural_base structural_tabs structural_hide; do
   rm -f "$run/logs/chatlog.json"
   case $m in structural_off) p="cpextended.dev.disable=true";; *) p="cpextended.none=1";; esac
   tools/run-mode.sh $m "$p"
@@ -62,10 +62,21 @@ for ph in before between after; do
   cp "$logs/q36_kill_check.log" "$logs/q36_kill_check-$ph.log"
 done
 
+echo "== phase 7 stage B: main-chat hiding, hidden retention, integration"
+tools/run-mode.sh hide
+tools/run-mode.sh hideperf
+rm -f "$run/logs/chatlog.json"
+tools/run-mode.sh hide_seed
+tools/run-mode.sh hide_relaunch
+python3 -I tools/make_restore_fixture.py "$run/logs/chatlog.json" > "$out/evidence/hide-relaunch2-fixture.json"
+tools/run-mode.sh hide_relaunch2
+tools/run-mode.sh hide_seed_nolog
+tools/run-mode.sh hide_relaunch_nolog
+
 echo "== V-35"; tools/run-v35.sh | tee "$out/evidence/v35-summary.txt"
 
 echo "== collect"
-cp "$run"/cpx-evidence/restore_seed-live.json "$out/evidence/" 2>/dev/null
+cp "$run"/cpx-evidence/restore_seed-live.json "$run"/cpx-evidence/hide-seed.json "$out/evidence/" 2>/dev/null
 rm -f "$run/cpx-evidence/q36_kill_check.jsonl"  # kept per kill point above
 cp "$run"/cpx-evidence/*.jsonl "$run"/cpx-evidence/*-mainchat.txt "$run"/cpx-evidence/*-chatlog.json "$out/evidence/" 2>/dev/null
 cp "$logs/compileClasspath.txt" "$out/evidence/"

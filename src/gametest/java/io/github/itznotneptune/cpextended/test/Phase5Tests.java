@@ -672,7 +672,8 @@ final class Phase5Tests {
 
 	// =================================================================== searchperf (V-13)
 
-	void searchperf() {
+	/** V-13; with {@code hiding}, the even-numbered tabs hide (mixed hiding traffic: half the messages leave the main chat). */
+	void searchperf(boolean hiding) {
 		String cfg;
 		StringBuilder ws = new StringBuilder();
 		double[][] pos = {{0.02, 0.02}, {0.02, 0.36}, {0.52, 0.02}, {0.52, 0.36}, {0.27, 0.66}};
@@ -683,7 +684,8 @@ final class Phase5Tests {
 			for (int k = 0; k < 2; k++) {
 				int tab = w * 2 + k;
 				if (k > 0) ws.append(",");
-				ws.append("{\"id\": \"pt").append(tab).append("\", \"include\": [{\"mode\": \"literal\", \"pattern\": \"cpx#P").append(tab % 10).append("-\"}]}");
+				ws.append("{\"id\": \"pt").append(tab).append("\", \"hideFromMainChat\": ").append(hiding && tab % 2 == 0)
+						.append(", \"include\": [{\"mode\": \"literal\", \"pattern\": \"cpx#P").append(tab % 10).append("-\"}]}");
 			}
 			ws.append("]}");
 		}
@@ -777,7 +779,11 @@ final class Phase5Tests {
 			m.put("typingPhase", row("renderMaxMs", round(renderMaxTyping), "renderMeanMs", round(renderMeanTyping), "fullRebuilds", rebuildsTyping, "queryChanges", typing.length));
 			boolean ok = rebuildsDuringArrivals == 0 && renderMaxArrivals < 16.7 && renderMaxTyping < 16.7 && rebuildsTyping <= typing.length * 5L
 					&& rebuildsRegex == 0 && renderMaxRegex < 16.7 && regexIndicator == TabSearch.Indicator.PARTIAL;
-			ev.result("V-13", ok, "observed", m, "criteria", "Extended's chat-open render under one 60 fps frame (16.7 ms) at every frame; no full rebuilds from arrivals (incremental only); rebuilds only on query changes (<= visible windows per change)",
+			if (hiding) {
+				m.put("hiddenRetained", onClient(() -> SessionMirror.get().hiddenSize()));
+				m.put("mainChatSize", onClient(() -> AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()).size()));
+			}
+			ev.result(hiding ? "V-13.mixedHiding" : "V-13", ok, "observed", m, "criteria", "Extended's chat-open render under one 60 fps frame (16.7 ms) at every frame; no full rebuilds from arrivals (incremental only); rebuilds only on query changes (<= visible windows per change)",
 					"note", "extendedRenderAllocated* covers Extended's whole chat-open render call (vanilla text drawing included); wholeClientThread* is everything on the client thread over the 10 s (vanilla and Chat Patches included); mixed hiding is Phase 7");
 		}
 		t.waitT(20);

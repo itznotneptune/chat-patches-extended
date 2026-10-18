@@ -57,7 +57,7 @@ public record ExtendedConfig(JsonObject raw, int schemaVersion, boolean newerSch
 			if (w.id() == null) continue; // unreadable window: its tabs stay suspended (never routed), preserved in the file
 			ws.add(new WindowConfig(w.id(), w.enabled(), tabs));
 		}
-		return RoutingConfig.of(ws);
+		return RoutingConfig.of(ws, hidingEnabled);
 	}
 
 	public @Nullable Window window(String id) {

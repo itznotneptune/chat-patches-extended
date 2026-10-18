@@ -34,6 +34,18 @@ public final class Router {
 		Diagnostics.event("config_installed", "tabs", newConfig.tabs().size(), "configSuspended", newConfig.configErrorSummary().keySet().toString());
 	}
 
+	/**
+	 * The §4.6 conditions beyond "a healthy hiding destination": global switch on; adapter not degraded and the hidden
+	 * cap readable (P7, else degraded); not AMBIGUOUS (unknown origin or unrecognized restored structure, Q16b); and
+	 * Chat Patches didn't condense a visible duplicate during this call (Q3, P3). Boundary lines never reach here (Q10).
+	 */
+	private static boolean hideAllowed(RoutingConfig cfg, CaptureFrame f, boolean ambiguous, ChatPatchesAdapter adapter) {
+		if (!cfg.hidingEnabled() || ambiguous || adapter.isDegraded()) return false;
+		if (adapter.chatMaxMessages().isEmpty()) return false; // unreadable cap: the adapter entered degraded mode (P7)
+		if (Capture.condensationDetected(f)) return false;
+		return true;
+	}
+
 	RoutingDecision decide(CaptureFrame f) {
 		RoutingConfig cfg = config; // one snapshot per message
 		if (cfg.tabs().isEmpty()) return RoutingDecision.NONE;
@@ -63,6 +75,7 @@ public final class Router {
 		// Exact matching text, no normalization (Q12); prepared once and shared by every tab (R-1).
 		MatchText text = MatchText.reusable(matchText);
 		List<TabState> deliver = new ArrayList<>();
+		boolean wouldHide = false;
 		SessionMirror mirror = SessionMirror.get();
 		for (RoutingConfig.CompiledTab tab : cfg.tabs()) {
 			if (tab.suspended()) continue; // invalid filters are never executed (Q14, Q28)
@@ -79,8 +92,14 @@ public final class Router {
 						"Tab '" + tab.id() + "' filter evaluation failed; tab suspended until relaunch", e, tab.config().name());
 				Diagnostics.event("tab_suspended", "tab", tab.id(), "exception", e.getClass().getName());
 			}
-			if (match) deliver.add(state);
+			if (match) {
+				deliver.add(state);
+				if (!wouldHide && tab.config().hideFromMainChat() && tab.config().enabled() && cfg.windowEnabled(tab.windowId()) && !state.isRuntimeSuspended()) {
+					wouldHide = true; // a healthy, enabled hiding tab in an enabled window that actually receives it
+				}
+			}
 		}
-		return new RoutingDecision(List.copyOf(deliver), false, ambiguous, false);
+		boolean hidden = wouldHide && hideAllowed(cfg, f, ambiguous, adapter);
+		return new RoutingDecision(List.copyOf(deliver), hidden, ambiguous, false);
 	}
 }

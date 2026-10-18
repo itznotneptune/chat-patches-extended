@@ -75,6 +75,12 @@ public final class ConfigScreen extends BaseScreen {
 			toggle.active = open.active;
 		}
 		pager(windows.size());
+		// The actual hiding state: the global switch, and whether hiding is paused by a compatibility problem (degraded, P9)
+		boolean on = m.config().hidingEnabled();
+		boolean paused = on && io.github.itznotneptune.cpextended.compat.ChatPatchesAdapter.get().isDegraded();
+		Button hiding = addRenderableWidget(Button.builder(Component.translatable(!on ? "cpextended.gui.hiding.off" : paused ? "cpextended.gui.hiding.paused" : "cpextended.gui.hiding.on"),
+				b -> apply(new ConfigEdit.SetHidingEnabled(!on))).bounds(width / 2 + 64, height - 52, 90, 20).build());
+		hiding.setTooltip(net.minecraft.client.gui.components.Tooltip.create(Component.translatable(paused ? "cpextended.gui.hiding.paused.tooltip" : "cpextended.gui.hiding.tooltip")));
 		addRenderableWidget(Button.builder(Component.translatable("cpextended.gui.add_window"), b -> addWindow())
 				.bounds(width / 2 - 154, height - 28, 150, 20).build());
 		addRenderableWidget(Button.builder(Component.translatable("gui.done"), b -> onClose())

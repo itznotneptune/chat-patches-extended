@@ -24,6 +24,7 @@ public final class TabState {
 	/** Entries appended and oldest entries removed (cap trimming) since creation: search caches follow these incrementally. */
 	private long appended, headRemoved;
 	private @Nullable List<MessageRecord> snapshot;
+	private int hiddenCount;
 
 	TabState(String id) {
 		this.id = id;
@@ -35,6 +36,8 @@ public final class TabState {
 	public int size() { return entries.size(); }
 	public long structureVersion() { return structureVersion; }
 	public long appendedCount() { return appended; }
+	/** Retained entries that are hidden from the main chat (Chat Patches' regex search never sees them, Q31). */
+	public int hiddenCount() { return hiddenCount; }
 	public long headRemovedCount() { return headRemoved; }
 	/** Entries newest first, without copying (client thread only). */
 	public Iterable<MessageRecord> newestFirst() { return entries.reversed(); }
@@ -58,6 +61,7 @@ public final class TabState {
 	void add(MessageRecord r, boolean flagged) {
 		if (entries.add(r)) {
 			appended++;
+			if (r.hidden()) hiddenCount++;
 			snapshot = null;
 			if (flagged) unread.add(r);
 		}
@@ -65,9 +69,11 @@ public final class TabState {
 	void remove(MessageRecord r) {
 		if (!entries.isEmpty() && entries.getFirst() == r) {
 			entries.removeFirst();
+			if (r.hidden()) hiddenCount--;
 			headRemoved++;
 			snapshot = null;
 		} else if (entries.remove(r)) {
+			if (r.hidden()) hiddenCount--;
 			structureVersion++;
 			snapshot = null;
 		}
@@ -75,6 +81,7 @@ public final class TabState {
 	}
 	void clear() {
 		entries.clear();
+		hiddenCount = 0;
 		unread.clear();
 		structureVersion++;
 		snapshot = null;

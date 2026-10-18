@@ -50,6 +50,7 @@ public final class SessionMirror {
 		RoutingDecision d = f.decision;
 		MessageRecord r = new MessageRecord(nextSeq++, message, f.original, f.origin, d != null && d.ambiguous(), f.matchText, f.reconstructionNote);
 		boolean hide = d != null && d.hidden();
+		if (hide) r.assign(true, r.tabIds());
 		if (d != null) {
 			for (TabState t : d.deliverTo()) {
 				// P4: flagged iff the tab isn't selected or its window is hidden; restored history is never flagged (Q23).
@@ -58,13 +59,40 @@ public final class SessionMirror {
 			}
 		}
 		if (hide) {
-			r.assign(true, r.tabIds());
 			hidden.addLast(r);
+			enforceHiddenCap();
 		} else {
 			records.addLast(r);
 		}
 		return r;
 	}
+
+	/**
+	 * P7: the hidden list's own session cap, equal to Chat Patches' {@code chatMaxMessages} read through the adapter
+	 * (16,384 if unreadable; the adapter is then degraded and nothing new is hidden). Oldest first; each pruned record
+	 * leaves every tab holding it, with its unread flags. The main chat is never touched. Ordinary retention, not orphan
+	 * restoration (Q27). Pruned records never come back.
+	 */
+	void enforceHiddenCap() {
+		java.util.OptionalInt cap = io.github.itznotneptune.cpextended.compat.ChatPatchesAdapter.get().chatMaxMessages();
+		int limit = cap.isPresent() ? cap.getAsInt() : FALLBACK_HIDDEN_CAP;
+		int pruned = 0;
+		while (hidden.size() > limit) {
+			MessageRecord old = hidden.pollFirst();
+			detach(old);
+			pruned++;
+		}
+		if (pruned > 0) {
+			hiddenPruned += pruned;
+			Diagnostics.event("hidden_pruned", "count", pruned, "cap", limit, "retained", hidden.size());
+		}
+	}
+
+	static final int FALLBACK_HIDDEN_CAP = 16384;
+	private long hiddenPruned;
+
+	/** Hidden records pruned by the P7 cap this session (diagnostics, V-48). */
+	public long hiddenPruned() { return hiddenPruned; }
 
 	/** A record for a main-chat entry that was never captured: no original, no routing (never guessed). */
 	MessageRecord unobserved(GuiMessage message) {
@@ -96,12 +124,12 @@ public final class SessionMirror {
 	public MessageRecord devAddHidden(GuiMessage message, net.minecraft.network.chat.Component original, List<String> tabIds) {
 		io.github.itznotneptune.cpextended.dev.DevHooks.requireDev();
 		MessageRecord r = new MessageRecord(nextSeq++, message, original, Origin.LIVE, false, original.getString(), null);
+		r.assign(true, List.of());
 		for (String id : tabIds) {
 			TabState t = state(id);
 			t.add(r, !Unread.readOnDelivery(id));
 			r.addTab(id);
 		}
-		r.assign(true, r.tabIds());
 		hidden.addLast(r);
 		return r;
 	}

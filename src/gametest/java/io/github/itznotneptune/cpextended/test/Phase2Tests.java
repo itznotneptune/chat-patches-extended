@@ -8,7 +8,6 @@ import com.google.gson.JsonParser;
 import io.github.itznotneptune.cpextended.config.ConfigEdit;
 import io.github.itznotneptune.cpextended.config.ConfigManager;
 import io.github.itznotneptune.cpextended.config.ExtendedConfig;
-import io.github.itznotneptune.cpextended.config.OrphanGuard;
 import io.github.itznotneptune.cpextended.core.MessageRecord;
 import io.github.itznotneptune.cpextended.core.Router;
 import io.github.itznotneptune.cpextended.core.Warnings;
@@ -540,7 +539,7 @@ final class Phase2Tests {
 	void v60() {
 		write(cfg(), doc(window("l-1", tabJson("keep", filterJson("literal", "cpx#KEEP")) + "," + tabJson("other", filterJson("literal", "o")))));
 		restart();
-		ctx.runOnClient(c -> OrphanGuard.devMarkHoldingHidden("keep"));
+		t.hideFixture("hidden in keep cpx#H-keep", "keep");
 		JsonObject j = json(cfg());
 		JsonArray tabs = j.getAsJsonArray("windows").get(0).getAsJsonObject().getAsJsonArray("tabs");
 		tabs.remove(0); // hand-edit: delete the tab that holds hidden messages
@@ -555,7 +554,7 @@ final class Phase2Tests {
 		ConfigManager.ActionResult refusedApply = onClient(() -> mgr().applyFile());
 		boolean stillLocked = onClient(() -> mgr().state()) == ConfigManager.State.DIVERGENCE && Arrays.equals(external, bytes(cfg()))
 				&& onClient(() -> mgr().config().windows().get(0).tabs().stream().anyMatch(x -> "keep".equals(x.id())));
-		ctx.runOnClient(c -> OrphanGuard.devMarkHoldingHidden(null)); // conditions fixed: no hidden messages any more
+		t.clearHiddenFixtures(); // conditions changed: no hidden messages any more
 		ConfigManager.ActionResult apply = onClient(() -> mgr().applyFile());
 		boolean applied = onClient(() -> mgr().state() == ConfigManager.State.NORMAL && mgr().config().windows().get(0).tabs().stream().noneMatch(x -> "keep".equals(x.id())));
 		// Separately: Overwrite file with current settings
@@ -656,15 +655,15 @@ final class Phase2Tests {
 	void noOrphanRestoration() {
 		write(cfg(), doc(window("o-1", tabJson("o-hidden", filterJson("literal", "h")) + "," + tabJson("o-free", filterJson("literal", "f")))));
 		restart();
-		ctx.runOnClient(c -> OrphanGuard.devMarkHoldingHidden("o-hidden"));
+		t.hideFixture("hidden in o-hidden cpx#H-o", "o-hidden");
 		ConfigManager.EditOutcome del = edit(new ConfigEdit.DeleteTab("o-hidden"));
 		ConfigManager.EditOutcome delFree = edit(new ConfigEdit.DeleteTab("o-free"));
 		ConfigManager.EditOutcome move = edit(new ConfigEdit.MoveTab("o-hidden", "o-1"));
 		boolean kept = onClient(() -> mgr().config().windows().get(0).tabs().stream().anyMatch(x -> "o-hidden".equals(x.id())));
-		ctx.runOnClient(c -> OrphanGuard.devMarkHoldingHidden(null));
+		t.clearHiddenFixtures();
 		ev.result("P2.noOrphanRestoration", !del.applied() && delFree.applied() && move.applied() && kept, "deleteTabHoldingHidden", del.edit(),
 				"deleteOtherTab", delFree.edit().outcome(), "tabKept", kept,
-				"note", "orphan-producing changes are refused on every path (edit, Apply file in V-60, Restore from backup); nothing is restored to the main chat");
+				"note", "Phase 7: an unconfirmed orphan-producing change is refused on every path (edit, Apply file in V-60, Restore from backup); the confirmed transaction is verified in q36.jsonl");
 	}
 
 	void noMessageDataInFile() {

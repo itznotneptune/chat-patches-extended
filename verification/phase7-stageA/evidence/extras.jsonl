@@ -1,0 +1,2 @@
+{"t":"mode","mode":"extras","time":"2026-10-18T15:44:41.504523Z","diagnosticsEnabled":true,"devDisabled":false}
+{"t":"result","mode":"extras","test":"V-14","outcome":"PASS","observed":{"modMenuLoaded":true,"noChatReportsLoaded":true,"modMenuFactoryScreen":"ConfigScreen","opensSameGui":true,"routedWithExtras":2},"note":"run with -Pextras=modmenu,ncr; the absent case is V-14.modMenuAbsent in mode gui"}

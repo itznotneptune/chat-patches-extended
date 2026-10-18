@@ -57,6 +57,12 @@ public final class Reconciler {
 				f.delivered = true;
 				mirror.record(f, f.message);
 				recovered++;
+			} else if (f.decision != null && f.decision.hidden() && !f.delivered && !f.failed && f.message != null && !containsIdentity(all, f.message)) {
+				// Decided hidden but abandoned before delivery: the main chat didn't take it, so the tabs must (D2: never
+				// invisible everywhere).
+				f.delivered = true;
+				mirror.record(f, f.message);
+				recovered++;
 			}
 		}
 

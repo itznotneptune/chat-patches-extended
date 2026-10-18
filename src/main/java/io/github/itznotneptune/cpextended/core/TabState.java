@@ -3,6 +3,7 @@ package io.github.itznotneptune.cpextended.core;
 
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayDeque;
 import java.util.LinkedHashSet;
 import java.util.List;
 
@@ -81,10 +82,20 @@ public final class TabState {
 
 	public boolean contains(MessageRecord r) { return entries.contains(r); }
 
-	/** Reorders the entries to follow {@code order} (the mirror's order); entries not in {@code order} are dropped. */
+	/**
+	 * Reorders the visible entries to follow {@code order} (the mirror's order); visible entries not in {@code order} are
+	 * dropped. Hidden entries aren't in the main chat, so they stay, placed by capture sequence among the visible ones.
+	 */
 	void reorder(Iterable<MessageRecord> order) {
+		ArrayDeque<MessageRecord> hiddenEntries = new ArrayDeque<>();
+		for (MessageRecord r : entries) if (r.hidden()) hiddenEntries.addLast(r);
 		LinkedHashSet<MessageRecord> next = new LinkedHashSet<>();
-		for (MessageRecord r : order) if (entries.contains(r)) next.add(r);
+		for (MessageRecord r : order) {
+			if (!entries.contains(r)) continue;
+			while (!hiddenEntries.isEmpty() && hiddenEntries.peekFirst().seq() < r.seq()) next.add(hiddenEntries.pollFirst());
+			next.add(r);
+		}
+		next.addAll(hiddenEntries);
 		entries.clear();
 		entries.addAll(next);
 		unread.retainAll(entries);

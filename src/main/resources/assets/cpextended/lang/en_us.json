@@ -7,6 +7,7 @@
   "cpextended.warning.config_no_save": "cpextended.json can't be used as is. Saving is disabled; see the log for the file and backup involved.",
   "cpextended.warning.config_divergence": "cpextended.json changed and can't be applied. Saving is disabled until you apply or overwrite the file.",
   "cpextended.warning.config_not_saved": "Settings were not saved. They stay in memory and saving is retried later.",
+  "cpextended.warning.lines_dirty": "Chat display needs a refresh; reopen chat or rejoin.",
   "cpextended.window.suspended": "(suspended)",
   "cpextended.window.empty": "(no messages)",
   "key.category.cpextended.main": "Chat Patches Extended",
@@ -49,5 +50,9 @@
   "cpextended.gui.save": "Save",
   "cpextended.search.no_matches": "No matches",
   "cpextended.search.partial": "Partial results",
-  "cpextended.search.invalid": "Invalid search expression"
+  "cpextended.search.invalid": "Invalid search expression",
+  "cpextended.gui.orphans.title": "Move hidden messages back to the main chat?",
+  "cpextended.gui.orphans.message": "%1$s hidden message(s) held only by %2$s will return to the main chat in their original order. No visible message will be pruned.",
+  "cpextended.gui.orphans.message_pruned": "%1$s hidden message(s) held only by %2$s will return to the main chat in their original order. %3$s older visible message(s) will be pruned by Chat Patches' history limit.",
+  "cpextended.gui.delete_window.choose": "Delete window %s: move or delete each tab"
 }

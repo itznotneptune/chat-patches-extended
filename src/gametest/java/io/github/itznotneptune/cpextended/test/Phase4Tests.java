@@ -8,7 +8,6 @@ import io.github.itznotneptune.cpextended.compat.ChatPatchesAdapter;
 import io.github.itznotneptune.cpextended.config.ConfigEdit;
 import io.github.itznotneptune.cpextended.config.ConfigManager;
 import io.github.itznotneptune.cpextended.config.ExtendedConfig;
-import io.github.itznotneptune.cpextended.config.OrphanGuard;
 import io.github.itznotneptune.cpextended.core.MessageRecord;
 import io.github.itznotneptune.cpextended.core.SessionMirror;
 import io.github.itznotneptune.cpextended.core.TabState;
@@ -448,19 +447,26 @@ final class Phase4Tests {
 	}
 
 	void orphanSafety() {
-		ctx.runOnClient(c -> OrphanGuard.devMarkHoldingHidden("gb1"));
+		t.hideFixture("hidden in gb1 cpx#H-gb1", "gb1");
 		WindowScreen ws = onClient(() -> new WindowScreen(new ConfigScreen(null), "g-b"));
 		open(ws);
 		boolean pressed = press("Delete");
 		boolean confirmShown = screen() instanceof net.minecraft.client.gui.screens.ConfirmScreen;
 		press("Yes");
+		// Phase 7: a second confirmation discloses the restoration (Q22); "No" changes nothing
+		boolean orphanDialog = screen() instanceof net.minecraft.client.gui.screens.ConfirmScreen cs && cs.getTitle().getString().contains("hidden messages");
+		press("No");
 		boolean tabKept = "g-b".equals(windowOf("gb1"));
 		String status = onClient(() -> ((WindowScreen) Minecraft.getInstance().screen).status().getString());
-		// deleting the whole window is refused too
+		// deleting the whole window: per-tab choice screen, then the same disclosure; "No" keeps everything
 		press("Delete window");
-		press("Yes");
-		boolean windowKept = onClient(() -> mgr().config().window("g-b") != null);
-		ctx.runOnClient(c -> OrphanGuard.devMarkHoldingHidden(null));
+		boolean choiceScreen = screen() instanceof io.github.itznotneptune.cpextended.gui.DeleteWindowScreen;
+		press("Delete window");
+		boolean orphanDialog2 = screen() instanceof net.minecraft.client.gui.screens.ConfirmScreen;
+		press("No");
+		boolean windowKept = onClient(() -> mgr().config().window("g-b") != null) && "g-b".equals(windowOf("gb1"));
+		t.clearHiddenFixtures();
+		ctx.setScreen(() -> null);
 		// "No" in a confirmation changes nothing; an empty window can be deleted
 		WindowScreen we = onClient(() -> new WindowScreen(new ConfigScreen(null), "g-empty"));
 		open(we);
@@ -470,9 +476,12 @@ final class Phase4Tests {
 		press("Delete window");
 		press("Yes");
 		boolean deleted = onClient(() -> mgr().config().window("g-empty") == null);
-		ev.result("P4.confirmationsNeverBypassOrphanSafety", pressed && confirmShown && tabKept && status.contains("orphan") && windowKept && keptAfterNo && deleted,
-				"confirmDialogShown", confirmShown, "tabKeptAfterYes", tabKept, "status", status, "windowDeleteRefused", windowKept,
-				"noChangesNothing", keptAfterNo, "emptyWindowDeleted", deleted, "note", "hidden messages simulated with the development hook (hiding is off)");
+		ev.result("P4.confirmationsNeverBypassOrphanSafety", pressed && confirmShown && orphanDialog && tabKept && status.contains("Nothing was changed")
+						&& choiceScreen && orphanDialog2 && windowKept && keptAfterNo && deleted,
+				"confirmDialogShown", confirmShown, "orphanDisclosureShown", orphanDialog, "tabKeptAfterNo", tabKept, "status", status,
+				"perTabChoiceScreen", choiceScreen, "windowDisclosureShown", orphanDialog2, "windowKeptAfterNo", windowKept,
+				"noChangesNothing", keptAfterNo, "emptyWindowDeleted", deleted,
+				"note", "Phase 7: synthetic hidden fixture (hiding off); the confirmed restoration itself is verified in q36.jsonl");
 		ctx.setScreen(() -> null);
 	}
 
@@ -498,17 +507,19 @@ final class Phase4Tests {
 		m.put("overwriteYesCleared", onClient(() -> mgr().state()) == ConfigManager.State.NORMAL);
 		ctx.setScreen(() -> null);
 		// divergence caused by an orphaning hand edit: Apply refused (orphan rule), never approximated
-		ctx.runOnClient(c -> OrphanGuard.devMarkHoldingHidden("gb1"));
+		t.hideFixture("hidden in gb1 cpx#H-gb1b", "gb1");
 		JsonObject j = Phase2Tests.json(Phase2Tests.cfg());
 		for (var w : j.getAsJsonArray("windows")) if (w.getAsJsonObject().get("id").getAsString().equals("g-b")) w.getAsJsonObject().add("tabs", new com.google.gson.JsonArray());
 		Phase2Tests.writeJson(Phase2Tests.cfg(), j);
 		open(() -> new ConfigScreen(null));
 		press("Apply file");
 		press("Yes");
+		m.put("orphanApplyDisclosed", screen() instanceof net.minecraft.client.gui.screens.ConfirmScreen);
+		press("No");
 		m.put("orphanApplyRefused", onClient(() -> mgr().state()) == ConfigManager.State.DIVERGENCE && "g-b".equals(windowOf("gb1")));
 		press("Overwrite file");
 		press("Yes");
-		ctx.runOnClient(c -> OrphanGuard.devMarkHoldingHidden(null));
+		t.clearHiddenFixtures();
 		ctx.setScreen(() -> null);
 		// no-save: Restore from backup and Replace file, each confirmed
 		byte[] good = Phase2Tests.bytes(Phase2Tests.cfg());

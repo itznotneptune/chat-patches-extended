@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Acceptance run (Milestones 1a, 1b, Phases 2-6) from a clean run directory, then evidence collection.
-# Usage: tools/run-all.sh [output-dir]   (default verification/phase6; earlier evidence directories are left as recorded)
+# Acceptance run (Milestones 1a, 1b, Phases 2-7) from a clean run directory, then evidence collection.
+# Usage: tools/run-all.sh [output-dir]   (default verification/phase7; earlier evidence directories are left as recorded)
 set -u
 root="$(cd "$(dirname "$0")/.." && pwd)"; cd "$root"
-run="build/run/clientGameTest"; logs="build/m1a-logs"; out="${1:-verification/phase6}"
+run="build/run/clientGameTest"; logs="build/m1a-logs"; out="${1:-verification/phase7}"
 export JAVA_HOME="$(/usr/libexec/java_home -v 25)"
 rm -rf build/run build/libs "$logs" "$out"; mkdir -p "$run" "$logs" "$out/evidence" "$out/logs"
 
@@ -51,10 +51,22 @@ python3 -I tools/make_restore_fixture.py "$run/logs/chatlog.json" | tee "$out/ev
 cp "$run/logs/chatlog.json" "$out/evidence/restore6-input-chatlog.json"
 tools/run-mode.sh restore6
 
+echo "== phase 7 stage A: Q36 orphan-restoration transaction (synthetic hidden fixtures)"
+tools/run-mode.sh q36
+tools/run-mode.sh q36_boundary
+for ph in before between after; do
+  tools/run-mode.sh q36_kill_$ph   # halts the JVM inside the commit on purpose (non-zero exit expected)
+  cp "$logs/q36_kill_$ph.log" "$logs/q36_kill_$ph.halted.log" 2>/dev/null
+  tools/run-mode.sh q36_kill_check
+  cp "$run/cpx-evidence/q36_kill_check.jsonl" "$out/evidence/q36_kill_check-$ph.jsonl"
+  cp "$logs/q36_kill_check.log" "$logs/q36_kill_check-$ph.log"
+done
+
 echo "== V-35"; tools/run-v35.sh | tee "$out/evidence/v35-summary.txt"
 
 echo "== collect"
 cp "$run"/cpx-evidence/restore_seed-live.json "$out/evidence/" 2>/dev/null
+rm -f "$run/cpx-evidence/q36_kill_check.jsonl"  # kept per kill point above
 cp "$run"/cpx-evidence/*.jsonl "$run"/cpx-evidence/*-mainchat.txt "$run"/cpx-evidence/*-chatlog.json "$out/evidence/" 2>/dev/null
 cp "$logs/compileClasspath.txt" "$out/evidence/"
 mkdir -p "$out/evidence/screenshots" && cp "$run"/screenshots/*p2-hud-*.png "$run"/screenshots/*p3-*.png "$run"/screenshots/*p4-*.png "$run"/screenshots/*p5-*.png "$run"/screenshots/*p6-*.png "$out/evidence/screenshots/" 2>/dev/null

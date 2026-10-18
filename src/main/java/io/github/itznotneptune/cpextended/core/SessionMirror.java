@@ -10,16 +10,19 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Session-only mirror of the main chat (D3, F1): one {@link MessageRecord} per main-chat entry, oldest first, and the
- * per-tab histories. A record lives while its {@link GuiMessage} is in {@code allMessages} (identity, §4.7); the
- * {@link Reconciler} keeps the two aligned at safe points. With no hiding yet, every record is visible. Client thread
- * only.
+ * Session-only mirror of the main chat (D3, F1): one {@link MessageRecord} per main-chat entry, oldest first, the
+ * session's hidden list (messages excluded from the main chat, oldest first, §4.7) and the per-tab histories. A visible
+ * record lives while its {@link GuiMessage} is in {@code allMessages} (identity); the {@link Reconciler} keeps the two
+ * aligned at safe points. A hidden record lives until hidden-list retention prunes it, the chat is cleared, or orphan
+ * restoration moves it back to the main chat. Nothing here is ever written to disk. Client thread only.
  */
 public final class SessionMirror {
 	private static final SessionMirror INSTANCE = new SessionMirror();
 
 	ArrayDeque<MessageRecord> records = new ArrayDeque<>();
-	private final Map<String, TabState> tabs = new LinkedHashMap<>();
+	/** Hidden records, oldest first (F1). */
+	ArrayDeque<MessageRecord> hidden = new ArrayDeque<>();
+	Map<String, TabState> tabs = new LinkedHashMap<>();
 	private long nextSeq = 1;
 
 	private SessionMirror() {}
@@ -30,6 +33,8 @@ public final class SessionMirror {
 
 	public int size() { return records.size(); }
 	public List<MessageRecord> records() { return new ArrayList<>(records); }
+	public int hiddenSize() { return hidden.size(); }
+	public List<MessageRecord> hiddenRecords() { return new ArrayList<>(hidden); }
 	public List<TabState> tabStates() { return new ArrayList<>(tabs.values()); }
 	public TabState tab(String id) { return tabs.get(id); }
 
@@ -44,6 +49,7 @@ public final class SessionMirror {
 	MessageRecord record(CaptureFrame f, GuiMessage message) {
 		RoutingDecision d = f.decision;
 		MessageRecord r = new MessageRecord(nextSeq++, message, f.original, f.origin, d != null && d.ambiguous(), f.matchText, f.reconstructionNote);
+		boolean hide = d != null && d.hidden();
 		if (d != null) {
 			for (TabState t : d.deliverTo()) {
 				// P4: flagged iff the tab isn't selected or its window is hidden; restored history is never flagged (Q23).
@@ -51,7 +57,12 @@ public final class SessionMirror {
 				r.addTab(t.id());
 			}
 		}
-		records.addLast(r);
+		if (hide) {
+			r.assign(true, r.tabIds());
+			hidden.addLast(r);
+		} else {
+			records.addLast(r);
+		}
 		return r;
 	}
 
@@ -63,6 +74,7 @@ public final class SessionMirror {
 	/** Drops every record and tab entry (F3+D, or disconnect with vanillaClearing; §4.8). Suspensions stay. */
 	void clear() {
 		records.clear();
+		hidden.clear();
 		for (TabState t : tabs.values()) t.clear();
 	}
 
@@ -72,5 +84,32 @@ public final class SessionMirror {
 			TabState t = tabs.get(id);
 			if (t != null) t.remove(r);
 		}
+	}
+
+	// ---------------------------------------------------------------- development only
+
+	/**
+	 * Development builds only (Q36 verification without enabling hiding): records {@code message} as a hidden message
+	 * delivered to {@code tabIds}, exactly as a hidden capture would leave it: in the hidden list and those tabs, not in
+	 * the main chat. Unread follows the delivery rule.
+	 */
+	public MessageRecord devAddHidden(GuiMessage message, net.minecraft.network.chat.Component original, List<String> tabIds) {
+		io.github.itznotneptune.cpextended.dev.DevHooks.requireDev();
+		MessageRecord r = new MessageRecord(nextSeq++, message, original, Origin.LIVE, false, original.getString(), null);
+		for (String id : tabIds) {
+			TabState t = state(id);
+			t.add(r, !Unread.readOnDelivery(id));
+			r.addTab(id);
+		}
+		r.assign(true, r.tabIds());
+		hidden.addLast(r);
+		return r;
+	}
+
+	/** Development builds only: drops every hidden record (fixture cleanup between test scenarios). */
+	public void devClearHidden() {
+		io.github.itznotneptune.cpextended.dev.DevHooks.requireDev();
+		for (MessageRecord r : hidden) detach(r);
+		hidden.clear();
 	}
 }

@@ -4,6 +4,7 @@ package io.github.itznotneptune.cpextended;
 import io.github.itznotneptune.cpextended.compat.ChatPatchesAdapter;
 import io.github.itznotneptune.cpextended.config.ConfigManager;
 import io.github.itznotneptune.cpextended.core.Capture;
+import io.github.itznotneptune.cpextended.core.OrphanRestore;
 import io.github.itznotneptune.cpextended.core.Diagnostics;
 import io.github.itznotneptune.cpextended.dev.DevHooks;
 import io.github.itznotneptune.cpextended.gui.Keybinds;
@@ -38,6 +39,7 @@ public final class CpExtended implements ClientModInitializer {
 			Capture.onTick(client.gui.getChat());
 			UnreadTracker.tick();
 			ConfigManager.get().tick();
+			OrphanRestore.tick(client);
 			Keybinds.tick(client);
 		});
 		Keybinds.register(); // P15: unbound by default

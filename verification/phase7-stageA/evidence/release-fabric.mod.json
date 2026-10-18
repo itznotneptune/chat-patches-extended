@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "cpextended",
+  "version": "0.7.0-phase7a",
+  "name": "Chat Patches Extended",
+  "description": "Unofficial companion for Chat Patches that routes chat messages into separate tabs. Not affiliated with or endorsed by the Chat Patches project.",
+  "authors": ["Neptune"],
+  "license": "LGPL-3.0-only",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["io.github.itznotneptune.cpextended.CpExtended"],
+    "modmenu": ["io.github.itznotneptune.cpextended.gui.ModMenuEntry"]
+  },
+  "mixins": ["cpextended.mixins.json"],
+  "depends": {
+    "java": ">=21",
+    "minecraft": "=1.21.11",
+    "chatpatches": "=8.0.0",
+    "fabricloader": ">=0.19.5",
+    "fabric-lifecycle-events-v1": ">=2.6.15+4ebb5c083e",
+    "fabric-rendering-v1": ">=16.2.10+0290ad933e",
+    "fabric-screen-api-v1": ">=3.1.7+4ebb5c083e",
+    "fabric-key-binding-api-v1": ">=1.1.7+4fc5413f3e"
+  },
+  "suggests": {
+    "modmenu": "*"
+  }
+}

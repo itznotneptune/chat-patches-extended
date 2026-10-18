@@ -1,0 +1,2 @@
+{"t":"mode","mode":"q36_kill_check","time":"2026-10-18T15:48:29.176112Z","diagnosticsEnabled":true,"devDisabled":false}
+{"t":"result","mode":"q36_kill_check","test":"V-20l.kill.beforeSwap","outcome":"PASS","fileIsOld":true,"fileIsNew":false,"parseable":true,"expected":"old","tempFilesAtCheck":0,"tempFilesAfterStartup":0,"relaunchState":"NORMAL","note":"the process was halted (Runtime.halt) at that point; this launch reads what was left on disk; session state is rebuilt from config plus Chat Patches' restore"}

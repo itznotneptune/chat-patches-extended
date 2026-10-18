@@ -1,0 +1,2 @@
+{"t":"mode","mode":"structural_off","time":"2026-10-18T15:34:38.012090Z","diagnosticsEnabled":false,"devDisabled":true}
+{"t":"result","mode":"structural_off","test":"structural.setup.structural_off","outcome":"PASS","state":{"devDisabled":true,"diagnosticsEnabled":false,"accessorApplied":false,"chatLogCount":12},"mainChatEntries":11,"note":"main chat and chatlog.json are compared across structural_off/base/tabs by tools/compare_structural.py"}

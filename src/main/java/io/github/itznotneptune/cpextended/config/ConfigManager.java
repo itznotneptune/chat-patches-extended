@@ -5,6 +5,7 @@ import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import io.github.itznotneptune.cpextended.CpExtended;
 import io.github.itznotneptune.cpextended.core.Diagnostics;
+import io.github.itznotneptune.cpextended.core.OrphanRestore;
 import io.github.itznotneptune.cpextended.core.Router;
 import io.github.itznotneptune.cpextended.core.Warnings;
 import io.github.itznotneptune.cpextended.dev.DevHooks;
@@ -30,7 +31,9 @@ import java.util.List;
  * it would orphan hidden messages). Memory and file are both kept; every save is blocked until Apply file or an
  * explicitly confirmed Overwrite file.</li>
  * </ul>
- * No path may bypass the orphan rules: orphan restoration isn't implemented, so orphan-producing changes are refused.
+ * No path may bypass the orphan rules (Q2, Q22, Q27, P5, P6, C-1, Q36): an orphan-producing change is refused unless
+ * it comes through one of the confirmed {@code ...RestoringOrphans} methods, which run the {@link OrphanRestore}
+ * transaction (projection, temp file, reference swap, atomic replace, rollback).
  * Only configuration is ever written: no message history, hidden references or unread state.
  */
 public final class ConfigManager {
@@ -95,6 +98,8 @@ public final class ConfigManager {
 		corruptCopy = null;
 		runningOnBackup = false;
 		divergedFingerprint = null;
+		int stale = storage.deleteStaleTemps();
+		if (stale > 0) CpExtended.LOGGER.info("Removed {} temporary file(s) left by an interrupted save of cpextended.json", stale);
 		ConfigStorage.Read r = storage.read();
 		if (r.unreadable()) {
 			// Can't rule anything out: run on defaults, write nothing; every save attempt re-checks the file.
@@ -163,10 +168,9 @@ public final class ConfigManager {
 		ConfigEdit.Result r = e.apply(copy, copyView);
 		if (r.outcome() != ConfigEdit.Outcome.APPLIED) return new EditOutcome(r, null);
 		ExtendedConfig next = ConfigParser.interpret(copy).config();
-		List<String> orphans = OrphanGuard.orphaningTabs(config.routing(), next.routing());
+		List<String> orphans = OrphanGuard.orphaningTabs(config, next);
 		if (!orphans.isEmpty()) {
-			return new EditOutcome(ConfigEdit.Result.rejected("would orphan hidden messages in " + orphans
-					+ "; orphan restoration isn't available, so the change is refused (keep, disable or move the tab instead)"), null);
+			return new EditOutcome(ConfigEdit.Result.rejected(needsConfirmation(orphans)), null);
 		}
 		use(next);
 		pending.add(e);
@@ -189,10 +193,9 @@ public final class ConfigManager {
 			if (r.outcome() != ConfigEdit.Outcome.APPLIED) return new EditOutcome(r, null);
 		}
 		ExtendedConfig next = ConfigParser.interpret(copy).config();
-		List<String> orphans = OrphanGuard.orphaningTabs(config.routing(), next.routing());
+		List<String> orphans = OrphanGuard.orphaningTabs(config, next);
 		if (!orphans.isEmpty()) {
-			return new EditOutcome(ConfigEdit.Result.rejected("would orphan hidden messages in " + orphans
-					+ "; orphan restoration isn't available, so the change is refused (keep, disable or move the tab instead)"), null);
+			return new EditOutcome(ConfigEdit.Result.rejected(needsConfirmation(orphans)), null);
 		}
 		use(next);
 		pending.addAll(edits);
@@ -303,11 +306,11 @@ public final class ConfigManager {
 					? "can't be parsed (" + p.error() + ")" : "has " + p.error()) + "; your settings and the file are both kept");
 			return SaveOutcome.BLOCKED_DIVERGENCE;
 		}
-		List<String> orphans = OrphanGuard.orphaningTabs(config.routing(), p.config().routing());
+		List<String> orphans = OrphanGuard.orphaningTabs(config, p.config());
 		if (!orphans.isEmpty()) {
 			divergedFingerprint = fp;
 			enter(State.DIVERGENCE, "cpextended.json was edited to remove tabs holding hidden messages " + orphans
-					+ "; that would orphan them and orphan restoration isn't available, so the edit isn't applied");
+					+ "; that needs your confirmation (Apply file moves them back to the main chat), so the edit isn't applied yet");
 			return SaveOutcome.BLOCKED_DIVERGENCE;
 		}
 		// Valid and non-orphaning: adopt the file, then re-apply the edits made since the last save on top of it.
@@ -320,7 +323,7 @@ public final class ConfigManager {
 			if (r.outcome() == ConfigEdit.Outcome.APPLIED) kept.add(e);
 		}
 		ExtendedConfig merged = ConfigParser.interpret(tree).config();
-		if (!OrphanGuard.orphaningTabs(config.routing(), merged.routing()).isEmpty()) {
+		if (!OrphanGuard.orphaningTabs(config, merged).isEmpty()) {
 			merged = adopted; // never let a re-applied edit orphan anything
 			kept.clear();
 		}
@@ -355,9 +358,9 @@ public final class ConfigManager {
 			if (p.status() != ConfigParser.Status.OK) return new ActionResult(false, "file still " + (p.error() == null ? "invalid" : p.error()));
 			next = p.config();
 		}
-		List<String> orphans = OrphanGuard.orphaningTabs(config.routing(), next.routing());
+		List<String> orphans = OrphanGuard.orphaningTabs(config, next);
 		if (!orphans.isEmpty()) {
-			return new ActionResult(false, "applying the file would orphan hidden messages in " + orphans + "; refused (orphan restoration isn't available)");
+			return new ActionResult(false, needsConfirmation(orphans));
 		}
 		use(next);
 		baseline = now.fingerprint();
@@ -403,8 +406,8 @@ public final class ConfigManager {
 		if (bak.bytes() == null) return new ActionResult(false, "no readable " + storage.backup().getFileName());
 		ConfigParser.Result p = ConfigParser.parse(bak.bytes());
 		if (p.status() != ConfigParser.Status.OK) return new ActionResult(false, storage.backup().getFileName() + " isn't valid either");
-		List<String> orphans = OrphanGuard.orphaningTabs(config.routing(), p.config().routing());
-		if (!orphans.isEmpty()) return new ActionResult(false, "the backup would orphan hidden messages in " + orphans + "; refused");
+		List<String> orphans = OrphanGuard.orphaningTabs(config, p.config());
+		if (!orphans.isEmpty()) return new ActionResult(false, needsConfirmation(orphans));
 		ActionResult w = replacePrimary(bak.bytes());
 		if (!w.ok()) return w;
 		use(p.config());
@@ -441,6 +444,195 @@ public final class ConfigManager {
 		dirty = false;
 		leaveNoSave();
 		return new ActionResult(true, "written");
+	}
+
+	// ---------------------------------------------------------------- orphan restoration (Q2, Q22, Q27, P5, P6, C-1, Q36)
+
+	/** What an orphan-producing change would do, for the confirmation (Q22 disclosure), or why it's refused. */
+	public record OrphanCheck(boolean orphaning, @Nullable String refusal, int restored, int pruned, List<String> tabs) {
+		static final OrphanCheck NONE = new OrphanCheck(false, null, 0, 0, List.of());
+		public boolean refused() { return refusal != null; }
+	}
+
+	private static String needsConfirmation(List<String> orphans) {
+		return "deleting " + orphans + " would leave hidden messages with no tab; that needs the confirmation that moves them back to the main chat"
+				+ " (nothing was changed). " + OrphanRestore.KEEP_DISABLE_MOVE;
+	}
+
+	private OrphanCheck check(ExtendedConfig next) {
+		OrphanRestore.Outcome o = OrphanRestore.plan(OrphanGuard.tabIds(config), OrphanGuard.tabIds(next));
+		return switch (o) {
+			case OrphanRestore.NoOrphans n -> OrphanCheck.NONE;
+			case OrphanRestore.Refused r -> new OrphanCheck(true, r.message(), 0, 0, List.of());
+			case OrphanRestore.Ready rd -> new OrphanCheck(true, null, rd.plan().restoredCount(), rd.plan().prunedCount(), List.copyOf(rd.plan().tabsWithOrphans()));
+		};
+	}
+
+	private @Nullable ExtendedConfig applied(List<ConfigEdit> edits, ConfigEdit.Result[] failure) {
+		JsonObject copy = config.raw().deepCopy();
+		for (ConfigEdit e : edits) {
+			ConfigEdit.Result r = e.apply(copy, ConfigParser.interpret(copy).config());
+			if (r.outcome() != ConfigEdit.Outcome.APPLIED) {
+				failure[0] = r;
+				return null;
+			}
+		}
+		return ConfigParser.interpret(copy).config();
+	}
+
+	/** Plans {@code edits}: whether they orphan hidden messages and, if so, the counts to disclose (or the refusal). */
+	public synchronized OrphanCheck checkEdits(List<ConfigEdit> edits) {
+		ConfigEdit.Result[] failure = new ConfigEdit.Result[1];
+		ExtendedConfig next = applied(edits, failure);
+		if (next == null) return new OrphanCheck(false, String.valueOf(failure[0].reason()), 0, 0, List.of());
+		return check(next);
+	}
+
+	/**
+	 * Applies orphan-producing {@code edits} after the player confirmed {@code disclosed}: one atomic operation with the
+	 * restoration (Q36). Re-plans now; if anything differs from what was disclosed, or any check fails, nothing changes.
+	 */
+	public synchronized EditOutcome editAllRestoringOrphans(List<ConfigEdit> edits, OrphanCheck disclosed) {
+		ConfigEdit.Result[] failure = new ConfigEdit.Result[1];
+		ExtendedConfig next = applied(edits, failure);
+		if (next == null) return new EditOutcome(failure[0], null);
+		String refusal = transact(next, disclosed, null);
+		if (refusal == NOT_ORPHANING) return editAll(edits);
+		if (refusal != null) return new EditOutcome(ConfigEdit.Result.rejected(refusal), null);
+		return new EditOutcome(ConfigEdit.Result.OK, SaveOutcome.SAVED);
+	}
+
+	/** Divergence lock: the counts Apply file would disclose (or its refusal), when the file orphans hidden messages. */
+	public synchronized OrphanCheck checkApplyFile() {
+		ExtendedConfig next = fileConfig();
+		return next == null ? OrphanCheck.NONE : check(next);
+	}
+
+	/** Divergence lock: Apply file that moves orphaned hidden messages back, after confirmation (no file write). */
+	public synchronized ActionResult applyFileRestoringOrphans(OrphanCheck disclosed) {
+		if (state != State.DIVERGENCE) return new ActionResult(false, "not in a divergence lock");
+		ConfigStorage.Read now = storage.read();
+		if (now.bytes() == null) return applyFile();
+		ExtendedConfig next = fileConfig();
+		if (next == null) return applyFile();
+		ConfigStorage.Fingerprint fp = now.fingerprint();
+		String refusal = transact(next, disclosed, fp);
+		if (refusal == NOT_ORPHANING) return applyFile();
+		if (refusal != null) return new ActionResult(false, refusal);
+		divergedFingerprint = null;
+		state = State.NORMAL;
+		stateDetail = "";
+		CpExtended.LOGGER.info("Divergence lock cleared: cpextended.json applied with orphan restoration");
+		return new ActionResult(true, "file applied; hidden messages moved back to the main chat");
+	}
+
+	/** No-save: the counts Restore from backup would disclose (or its refusal). */
+	public synchronized OrphanCheck checkRestoreFromBackup() {
+		ConfigStorage.Read bak = storage.readBackup();
+		if (bak.bytes() == null) return OrphanCheck.NONE;
+		ConfigParser.Result p = ConfigParser.parse(bak.bytes());
+		return p.status() == ConfigParser.Status.OK ? check(p.config()) : OrphanCheck.NONE;
+	}
+
+	/** No-save: Restore from backup that moves orphaned hidden messages back, after confirmation. */
+	public synchronized ActionResult restoreFromBackupRestoringOrphans(OrphanCheck disclosed) {
+		if (state != State.NO_SAVE) return new ActionResult(false, "not in the no-save state");
+		ConfigStorage.Read bak = storage.readBackup();
+		if (bak.bytes() == null) return new ActionResult(false, "no readable " + storage.backup().getFileName());
+		ConfigParser.Result p = ConfigParser.parse(bak.bytes());
+		if (p.status() != ConfigParser.Status.OK) return new ActionResult(false, storage.backup().getFileName() + " isn't valid either");
+		if (!baselineKnown) return new ActionResult(false, "cpextended.json couldn't be read at startup, so it can't be replaced safely while hidden messages depend on it");
+		String refusal = transact(p.config(), disclosed, null, bak.bytes());
+		if (refusal == NOT_ORPHANING) return restoreFromBackup(true);
+		if (refusal != null) return new ActionResult(false, refusal);
+		leaveNoSave();
+		CpExtended.LOGGER.info("cpextended.json restored from {} with orphan restoration", storage.backup().getFileName());
+		return new ActionResult(true, "restored from backup; hidden messages moved back to the main chat");
+	}
+
+	private @Nullable ExtendedConfig fileConfig() {
+		ConfigStorage.Read now = storage.read();
+		if (now.bytes() == null) return null;
+		ConfigParser.Result p = ConfigParser.parse(now.bytes());
+		return p.status() == ConfigParser.Status.OK ? p.config() : null;
+	}
+
+	private static final String NOT_ORPHANING = "\u0000not orphaning";
+
+	private String transact(ExtendedConfig next, OrphanCheck disclosed, @Nullable ConfigStorage.Fingerprint adoptOnDisk) {
+		return transact(next, disclosed, adoptOnDisk, null);
+	}
+
+	/**
+	 * The Q36 operation for a confirmed orphan-producing change to {@code next}. {@code adoptOnDisk} set: the file
+	 * already holds {@code next} with that fingerprint (Apply file), so the file step only verifies it's unchanged.
+	 * Otherwise {@code bytes} (or {@code next} serialized) replace the file atomically. Returns null when committed,
+	 * {@link #NOT_ORPHANING} when the change turned out not to orphan anything, or the refusal shown to the player.
+	 */
+	private @Nullable String transact(ExtendedConfig next, OrphanCheck disclosed, @Nullable ConfigStorage.Fingerprint adoptOnDisk, @Nullable byte[] bytes) {
+		if (adoptOnDisk == null && state == State.DIVERGENCE) return "saving is blocked by the divergence lock (" + stateDetail + "); nothing was changed";
+		if (adoptOnDisk == null && bytes == null && state == State.NO_SAVE) return "saving is disabled (" + stateDetail + "); nothing was changed";
+		if (adoptOnDisk == null && !baselineKnown) return "cpextended.json couldn't be read, so it can't be replaced safely; nothing was changed";
+		OrphanRestore.Outcome o = OrphanRestore.plan(OrphanGuard.tabIds(config), OrphanGuard.tabIds(next));
+		if (o instanceof OrphanRestore.NoOrphans) return NOT_ORPHANING;
+		if (o instanceof OrphanRestore.Refused r) return r.message();
+		OrphanRestore.Plan plan = ((OrphanRestore.Ready) o).plan();
+		if (plan.restoredCount() != disclosed.restored() || plan.prunedCount() != disclosed.pruned()) {
+			return "the chat changed since you confirmed (now " + plan.restoredCount() + " to move back, " + plan.prunedCount()
+					+ " to prune instead of " + disclosed.restored() + " and " + disclosed.pruned() + "); nothing was changed, please review and confirm again";
+		}
+		ExtendedConfig before = config;
+		RoutingConfig nextRouting = next.routing();
+		RoutingConfig beforeRouting = Router.get().config();
+		ConfigStorage.Prepared[] prepared = new ConfigStorage.Prepared[1];
+		ConfigStorage.Fingerprint[] written = new ConfigStorage.Fingerprint[1];
+		if (adoptOnDisk == null) {
+			ConfigStorage.PrepareResult pr = storage.prepareAtomic(bytes != null ? bytes : ConfigWriter.toBytes(next.raw()), baseline);
+			switch (pr.status()) {
+				case OK -> prepared[0] = pr.prepared();
+				case ATOMIC_UNSUPPORTED -> {
+					return "your file system doesn't support safe replacement of cpextended.json, so this deletion can't be performed safely; nothing was changed. "
+							+ OrphanRestore.KEEP_DISABLE_MOVE;
+				}
+				case CHANGED_ON_DISK -> {
+					return "cpextended.json changed on disk since it was last read; nothing was changed (reopen the settings to review the file)";
+				}
+				case UNREADABLE -> { return "cpextended.json can't be read to check for external edits; nothing was changed"; }
+				default -> { return "the new settings couldn't be written (" + pr.detail() + "); nothing was changed"; }
+			}
+		}
+		OrphanRestore.CommitResult cr = OrphanRestore.commit(plan, new OrphanRestore.ConfigSwap() {
+			public void swapIn() { config = next; Router.get().install(nextRouting); }
+			public void swapBack() { config = before; Router.get().install(beforeRouting); }
+		}, () -> {
+			if (adoptOnDisk != null) {
+				ConfigStorage.Read again = storage.read();
+				if (again.bytes() == null || !again.fingerprint().equals(adoptOnDisk)) return "cpextended.json changed again before it could be applied";
+				written[0] = adoptOnDisk;
+				return null;
+			}
+			ConfigStorage.ReplaceResult rr = storage.replaceAtomic(prepared[0]);
+			if (rr.status() == ConfigStorage.ReplaceStatus.REPLACED) {
+				written[0] = rr.written();
+				return null;
+			}
+			return switch (rr.status()) {
+				case UNSUPPORTED -> "your file system doesn't support safe replacement of cpextended.json, so this deletion can't be performed safely";
+				case CHANGED_ON_DISK -> "cpextended.json changed on disk during the save";
+				default -> "cpextended.json couldn't be replaced (" + rr.detail() + ")";
+			};
+		});
+		if (!cr.committed()) {
+			storage.abort(prepared[0]);
+			return cr.message() + "; nothing was changed";
+		}
+		baseline = written[0];
+		baselineKnown = true;
+		pending.clear();
+		dirty = false;
+		debounce = -1;
+		lastSave = SaveOutcome.SAVED;
+		return null;
 	}
 
 	// ---------------------------------------------------------------- internals

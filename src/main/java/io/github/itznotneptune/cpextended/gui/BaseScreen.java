@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 package io.github.itznotneptune.cpextended.gui;
 
+import io.github.itznotneptune.cpextended.config.ConfigEdit;
 import io.github.itznotneptune.cpextended.config.ConfigManager;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -8,6 +9,9 @@ import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Shared layout for the custom configuration screens (Q6: vanilla {@link Screen} subclasses only, no YACL): a title, a
@@ -46,9 +50,39 @@ abstract class BaseScreen extends Screen {
 
 	protected void confirm(Component title, Component message, Runnable onYes) {
 		minecraft.setScreen(new ConfirmScreen(yes -> {
+			minecraft.setScreen(this); // first, so onYes may open a further confirmation
 			if (yes) onYes.run();
-			minecraft.setScreen(this);
 		}, title, message));
+	}
+
+	/**
+	 * Applies {@code edits}; if they would orphan hidden messages (Q2), first shows what the restoration does (Q22
+	 * disclosure) and applies only on Yes, as one atomic operation (Q36). A refusal is shown as is; "No" changes nothing.
+	 * A confirmation never overrides a refusal.
+	 */
+	protected void runEdits(List<ConfigEdit> edits, Consumer<ConfigManager.EditOutcome> after) {
+		ConfigManager m = ConfigManager.get();
+		ConfigManager.OrphanCheck c = m.checkEdits(edits);
+		if (!c.orphaning()) {
+			after.accept(m.editAll(edits));
+			return;
+		}
+		if (c.refused()) {
+			setStatus(c.refusal(), true);
+			return;
+		}
+		confirmOrphans(c, () -> after.accept(m.editAllRestoringOrphans(edits, c)));
+	}
+
+	/** The Q2/Q22 confirmation: restored and pruned counts; "No" changes nothing. */
+	protected void confirmOrphans(ConfigManager.OrphanCheck c, Runnable onYes) {
+		minecraft.setScreen(new ConfirmScreen(yes -> {
+			minecraft.setScreen(this);
+			if (yes) onYes.run();
+			else setStatus("Nothing was changed", false);
+		}, Component.translatable("cpextended.gui.orphans.title"),
+				Component.translatable(c.pruned() > 0 ? "cpextended.gui.orphans.message_pruned" : "cpextended.gui.orphans.message",
+						c.restored(), String.join(", ", c.tabs()), c.pruned())));
 	}
 
 	protected void setStatus(String text, boolean error) {

@@ -6,7 +6,6 @@ import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -23,7 +22,10 @@ public final class MessageRecord {
 	private final boolean ambiguous;
 	private final @Nullable String matchText;
 	private final @Nullable String reconstructionNote;
-	private final List<String> tabIds = new ArrayList<>(2);
+	/** Ids of the tabs holding this record; an immutable list, replaced whole (Q36 swaps and rolls it back). */
+	private List<String> tabIds = List.of();
+	/** Excluded from the main chat (D2, F1): held only by tabs and the session's hidden list. Session-only. */
+	private boolean hidden;
 	/** Position in the mirror before the current reconcile pass (reconciler bookkeeping). */
 	int pos;
 
@@ -52,7 +54,19 @@ public final class MessageRecord {
 	public @Nullable String matchText() { return matchText; }
 	/** For an AMBIGUOUS restored message, why its structure wasn't recognized; else null. */
 	public @Nullable String reconstructionNote() { return reconstructionNote; }
-	public List<String> tabIds() { return Collections.unmodifiableList(tabIds); }
+	public List<String> tabIds() { return tabIds; }
+	public boolean hidden() { return hidden; }
 
-	void addTab(String id) { tabIds.add(id); }
+	void addTab(String id) {
+		List<String> next = new ArrayList<>(tabIds.size() + 1);
+		next.addAll(tabIds);
+		next.add(id);
+		tabIds = List.copyOf(next);
+	}
+
+	/** Plain field assignments (the Q36 commit and its rollback; no allocation). */
+	void assign(boolean hidden, List<String> tabIds) {
+		this.hidden = hidden;
+		this.tabIds = tabIds;
+	}
 }

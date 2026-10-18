@@ -107,9 +107,21 @@ public final class ConfigScreen extends BaseScreen {
 		else rebuildWidgets();
 	}
 
-	void applyFile() { result(ConfigManager.get().applyFile()); }
+	void applyFile() {
+		ConfigManager m = ConfigManager.get();
+		ConfigManager.OrphanCheck c = m.checkApplyFile();
+		if (!c.orphaning()) result(m.applyFile());
+		else if (c.refused()) setStatus(c.refusal(), true);
+		else confirmOrphans(c, () -> result(m.applyFileRestoringOrphans(c)));
+	}
 	void overwriteFile() { result(ConfigManager.get().overwriteFile(true)); }
-	void restoreBackup() { result(ConfigManager.get().restoreFromBackup(true)); }
+	void restoreBackup() {
+		ConfigManager m = ConfigManager.get();
+		ConfigManager.OrphanCheck c = m.checkRestoreFromBackup();
+		if (!c.orphaning()) result(m.restoreFromBackup(true));
+		else if (c.refused()) setStatus(c.refusal(), true);
+		else confirmOrphans(c, () -> result(m.restoreFromBackupRestoringOrphans(c)));
+	}
 	void replaceFile() { result(ConfigManager.get().replaceWithCurrentSettings(true)); }
 
 	private void result(ConfigManager.ActionResult r) {

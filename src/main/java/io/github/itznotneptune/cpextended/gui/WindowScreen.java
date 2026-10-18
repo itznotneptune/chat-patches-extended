@@ -79,14 +79,17 @@ public final class WindowScreen extends BaseScreen {
 			move.active = tabId != null && !others.isEmpty();
 			Button del = addRenderableWidget(Button.builder(Component.translatable("cpextended.gui.delete"), b -> confirm(
 					Component.translatable("cpextended.gui.delete_tab"), Component.translatable("cpextended.gui.delete_tab.confirm", label(t)),
-					() -> report(ConfigManager.get().edit(new ConfigEdit.DeleteTab(tabId))))).bounds(width / 2 + 112, ry, 42, 20).build());
+					() -> runEdits(List.of(new ConfigEdit.DeleteTab(tabId)), o -> { report(o); rebuildWidgets(); }))).bounds(width / 2 + 112, ry, 42, 20).build());
 			del.active = tabId != null;
 		}
 		pager(tabs.size());
 		addRenderableWidget(Button.builder(Component.translatable("cpextended.gui.add_tab"), b -> addTab()).bounds(width / 2 - 154, height - 28, 100, 20).build());
-		addRenderableWidget(Button.builder(Component.translatable("cpextended.gui.delete_window"), b -> confirm(
-				Component.translatable("cpextended.gui.delete_window"), Component.translatable("cpextended.gui.delete_window.confirm", windowId), this::deleteWindow))
-				.bounds(width / 2 - 50, height - 28, 100, 20).build());
+		addRenderableWidget(Button.builder(Component.translatable("cpextended.gui.delete_window"), b -> {
+			// P5: an empty window is deleted directly (after confirmation); a nonempty one needs a move-or-delete choice per tab
+			if (window().tabs().isEmpty()) confirm(Component.translatable("cpextended.gui.delete_window"),
+					Component.translatable("cpextended.gui.delete_window.confirm", windowId), this::deleteWindow);
+			else minecraft.setScreen(new DeleteWindowScreen(this, windowId));
+		}).bounds(width / 2 - 50, height - 28, 100, 20).build());
 		addRenderableWidget(Button.builder(Component.translatable("gui.back"), b -> onClose()).bounds(width / 2 + 54, height - 28, 100, 20).build());
 	}
 
@@ -128,13 +131,20 @@ public final class WindowScreen extends BaseScreen {
 	}
 
 	private void deleteWindow() {
-		ConfigManager.EditOutcome o = ConfigManager.get().edit(new ConfigEdit.DeleteWindow(windowId));
+		runEdits(List.of(new ConfigEdit.DeleteWindow(windowId)), this::afterWindowDeletion);
+	}
+
+	/** After the window's deletion was attempted (here or from the per-tab choice screen). */
+	void afterWindowDeletion(ConfigManager.EditOutcome o) {
 		report(o);
 		if (o.applied()) {
 			if (parent instanceof BaseScreen b) b.setStatus("Window " + windowId + " deleted", false);
 			minecraft.setScreen(parent);
+		} else {
+			minecraft.setScreen(this);
 		}
 	}
+
 
 	private void apply(ConfigEdit e) {
 		report(ConfigManager.get().edit(e));

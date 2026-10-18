@@ -100,6 +100,12 @@ public final class AcceptanceTest implements FabricClientGameTest {
 				case "searchperf" -> new Phase5Tests(this).searchperf();
 				case "restore_seed" -> new Phase6Tests(this).restoreSeed();
 				case "restore6" -> new Phase6Tests(this).restore6();
+				case "q36" -> new Phase7aTests(this).q36();
+				case "q36_boundary" -> new Phase7aTests(this).q36Boundary();
+				case "q36_kill_before" -> new Phase7aTests(this).q36Kill("beforeSwap");
+				case "q36_kill_between" -> new Phase7aTests(this).q36Kill("betweenSwapAndRename");
+				case "q36_kill_after" -> new Phase7aTests(this).q36Kill("afterReplace");
+				case "q36_kill_check" -> new Phase7aTests(this).q36KillCheck();
 				case "extras" -> new ExtrasTests(this).extras();
 				case "conflict_bool", "conflict_int", "conflict_error" -> conflict();
 				case "structural_off", "structural_base", "structural_tabs" -> structural();
@@ -239,6 +245,20 @@ public final class AcceptanceTest implements FabricClientGameTest {
 	}
 
 	int toasts() { return ctx.computeOnClient(c -> Warnings.toastsShown()); }
+
+	/**
+	 * Stage A fixture (Q36 verification without enabling hiding): a synthetic hidden message delivered to {@code tabs},
+	 * left exactly as a hidden capture would leave it (hidden list and tabs, not the main chat).
+	 */
+	MessageRecord hideFixture(String text, String... tabs) {
+		return ctx.computeOnClient(c -> {
+			Component comp = Component.literal(text);
+			GuiMessage g = new GuiMessage(c.gui.getGuiTicks(), comp, null, null);
+			return SessionMirror.get().devAddHidden(g, comp, List.of(tabs));
+		});
+	}
+
+	void clearHiddenFixtures() { ctx.runOnClient(c -> SessionMirror.get().devClearHidden()); }
 
 	// =================================================================== live (first launch)
 

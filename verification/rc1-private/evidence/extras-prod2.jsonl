@@ -1,0 +1,3 @@
+{"t":"mode","mode":"prod2","time":"2026-10-18T19:04:52.814284Z","diagnosticsEnabled":false,"devDisabled":false}
+{"t":"result","mode":"prod2","test":"RC1.restoredHistoryAfterRelaunch","outcome":"PASS","smokeTabAfterRelaunch":["hidden:cpx#SM-1","hidden:cpx#SM-3","hidden:cpx#SM-4","hidden:cpx#SM-5"],"note":"Chat Patches restored its log; recognized restored messages matching the hiding tab are routed and hidden again"}
+{"t":"usability_captures","orphanDisclosureShown":true,"tabKeptAfterNo":true}

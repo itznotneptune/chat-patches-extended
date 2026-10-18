@@ -122,3 +122,18 @@ tasks.withType<AbstractArchiveTask>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
 }
+
+// Private validation only (never part of a release): the acceptance-test mod remapped to intermediary, so selected
+// modes can run inside a production-style client against the release jar (tools/prodtest).
+val gametestDevJar by tasks.registering(Jar::class) {
+    archiveClassifier.set("gametest-dev")
+    destinationDirectory.set(layout.buildDirectory.dir("prodtest-jars"))
+    from(sourceSets["gametest"].output)
+}
+val remapGametestJar by tasks.registering(net.fabricmc.loom.task.RemapJarTask::class) {
+    dependsOn(gametestDevJar)
+    inputFile.set(gametestDevJar.flatMap { it.archiveFile })
+    archiveClassifier.set("gametest")
+    destinationDirectory.set(layout.buildDirectory.dir("prodtest-jars"))
+    classpath.from(sourceSets["gametest"].compileClasspath)
+}

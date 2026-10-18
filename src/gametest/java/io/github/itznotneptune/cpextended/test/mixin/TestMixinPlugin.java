@@ -20,7 +20,7 @@ public final class TestMixinPlugin implements IMixinConfigPlugin {
 		if (mixinClassName.endsWith("ConflictBooleanMixin")) return mode.equals("conflict_bool");
 		if (mixinClassName.endsWith("ConflictIntMixin")) return mode.equals("conflict_int");
 		if (mixinClassName.endsWith("ConflictErrorMixin")) return mode.equals("conflict_error");
-		return !mode.startsWith("structural");
+		return !mode.startsWith("structural") && !mode.startsWith("prod"); // production validation: no test mixins
 	}
 
 	@Override public void acceptTargets(Set<String> myTargets, Set<String> otherTargets) {}

@@ -1,0 +1,17 @@
+{
+ "profile": "/Users/austin/Desktop/ChatPatches+/build/prodtest/extras",
+ "java": "/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin/java",
+ "classpathEntries": 80,
+ "mods": [
+  "chat-heads-905FjRkG.jar",
+  "chatpatches-8.0.0+1.21.11-fabric.jar",
+  "cpextended-1.0.0-rc.1-gametest.jar",
+  "cpextended-1.0.0-rc.1.jar",
+  "fabric-api-0.141.6+1.21.11.jar",
+  "fabric-client-gametest-api-v1-4.3.5+bfe9fcf43e.jar",
+  "modmenu-17.0.1.jar",
+  "no-chat-reports-Fabric-1.21.11-v2.18.0.jar",
+  "placeholder-api-2.8.2+1.21.10.jar",
+  "yacl-3.8.2+1.21.11-fabric.jar"
+ ]
+}

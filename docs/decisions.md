@@ -16,7 +16,7 @@ Related documents: [feasibility-and-architecture.md](feasibility-and-architectur
 | **Engineering decision (ED)** | A routine technical decision made under the owner's delegated authority (§0). It must not contradict any Approved item, and the owner may override it. |
 | **Assumption (A-n)** | A conservative resolution of a minor ambiguity, recorded with reasoning (§1.5). |
 
-**Implementation status: not authorized.** Documentation only. Approved: **D1–D12, D6.1, F1–F4, Q1–Q34, Q36 (conditional), C-1, P1–P15** (P4 approved; other P-items conditional). Assumptions A-3, A-4 (§1.5). **Q35 complete.** Open: **Q37 only**: owner-reserved, **non-blocking**, relaunch-only baseline. **Blocking owner decisions: 0.**
+**Implementation status: not authorized.** Documentation only. Approved: **D1–D12, D6.1, F1–F4, Q1–Q34, Q36 (conditional), C-1, P1–P15** (P4 approved; other P-items conditional). Assumptions A-3, A-4 (§1.5). **Q35 complete.** Q37: **deferred enhancement** (owner, Phase 8): relaunch-only baseline for the initial release. **Blocking owner decisions: 0.**
 
 ---
 
@@ -233,7 +233,9 @@ The owner chose Q35 option (b): review the specifications **individually**.
 
 ### 2.2 Owner-reserved (non-blocking)
 
-### Q37 — Can a player edit lift a runtime suspension mid-session? (P9) — *Non-blocking (Phase 2/4)*
+### Q37 — Can a player edit lift a runtime suspension mid-session? (P9) — *Deferred enhancement (owner, Phase 8, 2026-10-19)*
+- **Owner decision (Phase 8 authorization):** for the initial release the **relaunch-only baseline is retained**: a runtime-suspended tab recovers only after restarting the client. No automatic recovery, save-triggered recovery or manual retry button in the initial release. Q37 is recorded as **deferred enhancement work** and is **not a release blocker**. Options (b) and (c) below remain candidates for a later release.
+
 - **Why it needs you:** P9 approves that a runtime-suspended tab stays suspended with **no automatic recovery**, and the documented recovery is **relaunch**. You didn't specify whether an *intentional* player action should lift it earlier, and P9 forbids inventing one without approval.
 - **Options:**
   - **Current baseline (unchanged, per owner instruction 2026-10-18):** runtime suspension lasts **until relaunch**. No retry button, automatic recovery or save-triggered recovery may be introduced until Q37 is decided.

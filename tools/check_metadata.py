@@ -1,6 +1,9 @@
 """V-64: checks the built jar's fabric.mod.json against P15 and the Fabric API modules the code actually imports.
 Usage: check_metadata.py <jar> <src-main-java-dir> <log>... ; prints a JSON result line."""
 import json
+import os
+import subprocess
+import tempfile
 import pathlib
 import re
 import sys
@@ -45,6 +48,28 @@ for log in logs:
         if ("WARN" in line or "Warning" in line) and "FabricLoader" in line and "cpextended" in line:
             warnings.append(line.strip()[:200])
 checks["noLoaderWarnings"] = not warnings
+
+# V-46d (static): Extended never compiles or executes a regex. No class may reference java.util.regex, and none may
+# call the String methods that run one internally (matches, replaceAll, replaceFirst, split).
+regex_refs, regex_calls = [], []
+javap = os.path.join(os.environ.get("JAVA_HOME", ""), "bin", "javap")
+with tempfile.TemporaryDirectory() as tmp, zipfile.ZipFile(jar) as z:
+    classes = [n for n in z.namelist() if n.endswith(".class")]
+    for n in classes:
+        data = z.read(n)
+        if b"java/util/regex" in data:
+            regex_refs.append(n)
+        z.extract(n, tmp)
+    out = subprocess.run([javap, "-c", "-p"] + [os.path.join(tmp, n) for n in classes], capture_output=True, text=True, check=True).stdout
+    cls = None
+    for line in out.splitlines():
+        if line.startswith(("class ", "public ", "final ", "abstract ", "interface ")) and "{" in line:
+            cls = line
+        m = re.search(r"Method java/lang/String\.(matches|replaceAll|replaceFirst|split):", line)
+        if m:
+            regex_calls.append((cls or "?")[:120] + " -> " + m.group(1))
+print(json.dumps({"test": "V-46d.static", "outcome": "PASS" if classes and not regex_refs and not regex_calls else "FAIL",
+                  "classesScanned": len(classes), "regexReferences": regex_refs, "regexStringCalls": regex_calls}))
 print(json.dumps({"test": "V-64", "outcome": "PASS" if all(checks.values()) else "FAIL", "checks": checks,
                   "declaredModules": sorted(declared), "usedModules": sorted(used), "unmappedImports": sorted(unknown),
                   "loaderWarnings": warnings,

@@ -1048,5 +1048,9 @@ final class Phase3Tests {
 		@Override public boolean overContextMenu(ChatScreen s, double x, double y) { return real.overContextMenu(s, x, y); }
 		@Override public boolean overSettingsMenu(ChatScreen s, double x, double y) { return real.overSettingsMenu(s, x, y); }
 		@Override public int mainChatLineAt(double x, double y) { return real.mainChatLineAt(x, y); }
+		@Override public boolean searchCaseSensitive() { return real.searchCaseSensitive(); }
+		@Override public boolean searchRegex() { return real.searchRegex(); }
+		@Override public boolean searchEmptyShowsFullChat() { return real.searchEmptyShowsFullChat(); }
+		@Override public java.util.List<net.minecraft.client.GuiMessage> searchResults(ChatScreen s) { return real.searchResults(s); }
 	}
 }

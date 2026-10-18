@@ -1,0 +1,2 @@
+{"t":"mode","mode":"conflict_bool","time":"2026-10-18T03:54:45.725292Z","diagnosticsEnabled":true,"devDisabled":false}
+{"t":"result","mode":"conflict_bool","test":"V-59.4.conflict_bool","outcome":"PASS","state":{"degraded":false,"searchIntegrationOff":true,"failedOps":"[SEARCH_VISIBILITY]","toasts":1,"warnings":"{adapter:SEARCH_VISIBILITY:showSearchBar ambiguous (exact matches=1, renamed Chat Patches variant=true):-=1}","searchBarShown":"null","showSearchBarFields":["showSearchBar:boolean","fd8de04a$chatpatches$showSearchBar$0:boolean"]},"routingUnaffected":true}

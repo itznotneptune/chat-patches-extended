@@ -96,6 +96,8 @@ public final class AcceptanceTest implements FabricClientGameTest {
 				case "drag" -> new Phase4Tests(this).drag();
 				case "keys" -> new Phase4Tests(this).keys();
 				case "scales" -> new Phase4Tests(this).scales();
+				case "search" -> new Phase5Tests(this).search();
+				case "searchperf" -> new Phase5Tests(this).searchperf();
 				case "extras" -> new ExtrasTests(this).extras();
 				case "conflict_bool", "conflict_int" -> conflict();
 				case "structural_off", "structural_base", "structural_tabs" -> structural();
@@ -934,6 +936,10 @@ public final class AcceptanceTest implements FabricClientGameTest {
 			@Override public boolean overContextMenu(ChatScreen screen, double x, double y) { return real.overContextMenu(screen, x, y); }
 			@Override public boolean overSettingsMenu(ChatScreen screen, double x, double y) { return real.overSettingsMenu(screen, x, y); }
 			@Override public int mainChatLineAt(double x, double y) { return real.mainChatLineAt(x, y); }
+			@Override public boolean searchCaseSensitive() { return real.searchCaseSensitive(); }
+			@Override public boolean searchRegex() { return real.searchRegex(); }
+			@Override public boolean searchEmptyShowsFullChat() { return real.searchEmptyShowsFullChat(); }
+			@Override public java.util.List<net.minecraft.client.GuiMessage> searchResults(ChatScreen s) { return real.searchResults(s); }
 		};
 	}
 

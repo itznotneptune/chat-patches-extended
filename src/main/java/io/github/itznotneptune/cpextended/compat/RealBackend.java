@@ -34,4 +34,8 @@ final class RealBackend implements ChatPatchesBackend {
 	}
 	@Override public boolean overSettingsMenu(ChatScreen screen, double x, double y) { return ((ChatScreenAccess) screen).isMouseOverSettingsMenu(x, y); }
 	@Override public int mainChatLineAt(double x, double y) { return ((ChatComponentAccess) Minecraft.getInstance().gui.getChat()).getEoEIndex(x, y); }
+	@Override public boolean searchCaseSensitive() { return ChatPatches.config.caseSensitive; }
+	@Override public boolean searchRegex() { return ChatPatches.config.regex; }
+	@Override public boolean searchEmptyShowsFullChat() { return ChatPatches.config.searchEmptyShowsFullChat; }
+	@Override public java.util.List<net.minecraft.client.GuiMessage> searchResults(ChatScreen screen) { return ((ChatScreenAccess) screen).getSearchResults(); }
 }

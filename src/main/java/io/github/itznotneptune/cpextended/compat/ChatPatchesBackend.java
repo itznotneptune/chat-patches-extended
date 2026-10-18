@@ -28,4 +28,11 @@ public interface ChatPatchesBackend {
 	boolean overSettingsMenu(ChatScreen screen, double x, double y);
 	/** {@code ChatComponentAccess.getEoEIndex}: the main-chat message under the point, or -1. */
 	int mainChatLineAt(double x, double y);
+
+	// Search settings and results (Class Q, Q29a/Q31)
+	boolean searchCaseSensitive();
+	boolean searchRegex();
+	boolean searchEmptyShowsFullChat();
+	/** {@code ChatScreenAccess.getSearchResults()}: Chat Patches' current main-chat search results. */
+	java.util.List<net.minecraft.client.GuiMessage> searchResults(ChatScreen screen);
 }

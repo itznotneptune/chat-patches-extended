@@ -8,6 +8,8 @@ import io.github.itznotneptune.cpextended.core.Router;
 import io.github.itznotneptune.cpextended.core.SessionMirror;
 import io.github.itznotneptune.cpextended.core.TabState;
 import io.github.itznotneptune.cpextended.model.RoutingConfig;
+import io.github.itznotneptune.cpextended.core.Diagnostics;
+import io.github.itznotneptune.cpextended.search.TabSearch;
 import io.github.itznotneptune.cpextended.ui.HitTester;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -19,6 +21,7 @@ import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.player.ChatVisiblity;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -61,6 +64,14 @@ public final class ChatOpenRenderer {
 	private static final Map<String, String> LAST_SHOWN = new HashMap<>();
 
 	private static final Map<String, Integer> SCROLL = new HashMap<>();
+	/** Separate scroll for search views (P13): reset on every search change, never touching the normal view's scroll. */
+	private static final Map<String, Integer> SEARCH_SCROLL = new HashMap<>();
+	private static long seenSearchChange = -1;
+	private static final Map<String, TabSearch.Indicator> INDICATORS = new HashMap<>();
+	private static final Map<String, List<MessageRecord>> VIEWS = new HashMap<>();
+	private record LineCount(List<MessageRecord> entries, int width, int total) {}
+	private static final Map<String, LineCount> LINE_COUNTS = new HashMap<>();
+	private static long renderNanosMax, renderNanosTotal, renderFrames, renderAllocTotal;
 	/** Layouts of the last frame, front to back. */
 	private static List<Layout> lastLayouts = List.of();
 	private static long tooltipFrames;
@@ -79,8 +90,15 @@ public final class ChatOpenRenderer {
 
 	/** beforeRender of the ChatScreen: draws every visible window back to front, then moves to the next stratum. */
 	public static void render(ChatScreen screen, GuiGraphics g, int mouseX, int mouseY) {
+		long t0 = System.nanoTime();
+		long a0 = Diagnostics.ENABLED ? allocatedBytes() : 0;
 		Minecraft mc = Minecraft.getInstance();
 		ExtendedConfig cfg = ConfigManager.get().config();
+		TabSearch.update(screen);
+		if (TabSearch.changeCount() != seenSearchChange) { // query or settings changed: every search view to its newest entry
+			seenSearchChange = TabSearch.changeCount();
+			SEARCH_SCROLL.clear();
+		}
 		List<Layout> drawn = new ArrayList<>();
 		if (cfg.enabled() && mc.options.chatVisibility().get() != ChatVisiblity.HIDDEN) {
 			RenderSupport.Look look = RenderSupport.look(cfg.appearance());
@@ -95,6 +113,16 @@ public final class ChatOpenRenderer {
 		java.util.Collections.reverse(frontToBack);
 		lastLayouts = List.copyOf(frontToBack);
 		g.nextStratum(); // everything the chat screen draws now sits above the windows (P10)
+		long dt = System.nanoTime() - t0;
+		renderNanosMax = Math.max(renderNanosMax, dt);
+		renderNanosTotal += dt;
+		renderFrames++;
+		if (Diagnostics.ENABLED) renderAllocTotal += allocatedBytes() - a0;
+	}
+
+	/** Bytes allocated so far by this thread (developer measurement only, V-13). */
+	private static long allocatedBytes() {
+		return ManagementFactory.getThreadMXBean() instanceof com.sun.management.ThreadMXBean mx ? mx.getCurrentThreadAllocatedBytes() : 0;
 	}
 
 	private static Layout drawWindow(GuiGraphics g, Font font, RenderSupport.Look look, ExtendedConfig.Window w, RoutingConfig routing) {
@@ -184,37 +212,59 @@ public final class ChatOpenRenderer {
 
 		// Body lines, newest at the bottom, scrolled by this window's own offset.
 		TabState st = shown == null || shown.id() == null ? null : SessionMirror.get().tab(shown.id());
-		List<MessageRecord> entries = st == null ? List.of() : st.entries();
+		TabSearch.View view = shown == null || shown.id() == null ? new TabSearch.View(false, List.of(), TabSearch.Indicator.NONE) : TabSearch.view(shown.id(), st);
+		List<MessageRecord> entries = view.entries(); // the search view while searching (display only), else the full history
+		INDICATORS.put(w.id(), view.indicator());
+		VIEWS.put(w.id(), entries);
+		Map<String, Integer> scrollMap = view.searching() ? SEARCH_SCROLL : SCROLL;
 		int innerW = Math.max(1, (int) ((body[2] - RenderSupport.PADDING * 2 - SCROLLBAR_W) / scale));
 		int visible = Math.max(0, (int) ((body[3] - RenderSupport.PADDING * 2) / (lineH * scale)));
-		List<FormattedCharSequence> all = new ArrayList<>(); // newest first
-		for (int i = entries.size() - 1; i >= 0; i--) {
-			List<FormattedCharSequence> ls = RenderSupport.wrap(entries.get(i), font, innerW);
-			for (int j = ls.size() - 1; j >= 0; j--) all.add(ls.get(j));
+		// Total wrapped lines: cached per window while its entry list (an immutable snapshot) and width are unchanged, so
+		// a frame touches only the lines it draws (V-13).
+		LineCount lc = LINE_COUNTS.get(w.id());
+		if (lc == null || lc.entries() != entries || lc.width() != innerW) {
+			int n = 0;
+			for (MessageRecord e : entries) n += RenderSupport.wrap(e, font, innerW).size();
+			LINE_COUNTS.put(w.id(), lc = new LineCount(entries, innerW, n));
 		}
-		int maxScroll = Math.max(0, all.size() - visible);
-		int scroll = Math.min(SCROLL.getOrDefault(w.id(), 0), maxScroll);
-		SCROLL.put(w.id(), scroll);
+		int totalLines = lc.total();
+		int maxScroll = Math.max(0, totalLines - visible);
+		int scroll = Math.min(scrollMap.getOrDefault(w.id(), 0), maxScroll);
+		scrollMap.put(w.id(), scroll);
 		List<LineSlot> lines = new ArrayList<>();
 		int textColor = RenderSupport.argb(look.textOpacity(), 0xFFFFFF);
 		int pad = (lineH - 9) / 2;
-		for (int k = 0; k < visible && scroll + k < all.size(); k++) {
-			int ly = body[1] + body[3] - RenderSupport.PADDING - (int) Math.round((k + 1) * lineH * scale);
-			FormattedCharSequence seq = all.get(scroll + k);
-			int lx = body[0] + RenderSupport.PADDING;
-			g.pose().pushMatrix();
-			g.pose().translate(lx, ly);
-			g.pose().scale((float) scale, (float) scale);
-			g.drawString(font, seq, 0, pad, textColor, true);
-			g.pose().popMatrix();
-			lines.add(new LineSlot(lx, ly, (int) Math.round(lineH * scale), scale, seq));
+		int lineNo = 0, k = 0; // lineNo counts lines newest first
+		for (int i = entries.size() - 1; i >= 0 && k < visible; i--) {
+			List<FormattedCharSequence> ls = RenderSupport.wrap(entries.get(i), font, innerW);
+			if (lineNo + ls.size() <= scroll) { lineNo += ls.size(); continue; }
+			for (int j = ls.size() - 1; j >= 0 && k < visible; j--, lineNo++) {
+				if (lineNo < scroll) continue;
+				int ly = body[1] + body[3] - RenderSupport.PADDING - (int) Math.round((k + 1) * lineH * scale);
+				FormattedCharSequence seq = ls.get(j);
+				int lx = body[0] + RenderSupport.PADDING;
+				g.pose().pushMatrix();
+				g.pose().translate(lx, ly);
+				g.pose().scale((float) scale, (float) scale);
+				g.drawString(font, seq, 0, pad, textColor, true);
+				g.pose().popMatrix();
+				lines.add(new LineSlot(lx, ly, (int) Math.round(lineH * scale), scale, seq));
+				k++;
+			}
+		}
+
+		// Search indicators (display only, never a message): "No matches" (P13) or "Partial results" (Q31).
+		if (view.indicator() != TabSearch.Indicator.NONE) {
+			Component note = Component.translatable(view.indicator() == TabSearch.Indicator.NO_MATCHES ? "cpextended.search.no_matches" : "cpextended.search.partial");
+			int nx = body[0] + body[2] - SCROLLBAR_W - 2 - font.width(note);
+			g.drawString(font, note, Math.max(body[0] + 2, nx), body[1] + 2, 0xFF909090, true);
 		}
 
 		// Scrollbar and resize grip.
 		int[] scrollbar = null;
 		if (maxScroll > 0) {
 			scrollbar = new int[]{body[0] + body[2] - SCROLLBAR_W, body[1], SCROLLBAR_W, body[3]};
-			int thumbH = Math.max(6, body[3] * visible / Math.max(1, all.size()));
+			int thumbH = Math.max(6, body[3] * visible / Math.max(1, totalLines));
 			int thumbY = body[1] + (body[3] - thumbH) * (maxScroll - scroll) / maxScroll;
 			g.fill(scrollbar[0], scrollbar[1], scrollbar[0] + scrollbar[2], scrollbar[1] + scrollbar[3], 0x40FFFFFF);
 			g.fill(scrollbar[0], thumbY, scrollbar[0] + scrollbar[2], thumbY + thumbH, 0xC0FFFFFF);
@@ -222,7 +272,7 @@ public final class ChatOpenRenderer {
 		int[] grip = {r[0] + r[2] - GRIP, r[1] + r[3] - GRIP, GRIP, GRIP};
 		for (int i = 0; i < 3; i++) g.fill(grip[0] + GRIP - 2 - i * 2, grip[1] + GRIP - 2, grip[0] + GRIP - 1 - i * 2, grip[1] + GRIP - 1, 0xC0FFFFFF);
 		for (int i = 1; i < 3; i++) g.fill(grip[0] + GRIP - 2, grip[1] + GRIP - 2 - i * 2, grip[0] + GRIP - 1, grip[1] + GRIP - 1 - i * 2, 0xC0FFFFFF);
-		return new Layout(w.id(), r, strip, List.copyOf(slots), lock, body, scrollbar, grip, List.copyOf(lines), all.size(), visible, maxScroll,
+		return new Layout(w.id(), r, strip, List.copyOf(slots), lock, body, scrollbar, grip, List.copyOf(lines), totalLines, visible, maxScroll,
 				leftArrow, rightArrow, tabs.size(), first, leftColor, rightColor);
 	}
 
@@ -333,17 +383,33 @@ public final class ChatOpenRenderer {
 
 	public static List<Layout> lastLayouts() { return lastLayouts; }
 
+	/** The scroll map in use: search views have their own while a search is active. */
+	private static Map<String, Integer> scrollMap() {
+		return TabSearch.state().active() ? SEARCH_SCROLL : SCROLL;
+	}
+
 	public static void scroll(String windowId, int lines) {
 		Layout l = null;
 		for (Layout c : lastLayouts) if (c.windowId().equals(windowId)) l = c;
 		int max = l == null ? Integer.MAX_VALUE : l.maxScroll();
-		SCROLL.put(windowId, Math.max(0, Math.min(max, SCROLL.getOrDefault(windowId, 0) + lines)));
+		Map<String, Integer> m = scrollMap();
+		m.put(windowId, Math.max(0, Math.min(max, m.getOrDefault(windowId, 0) + lines)));
 	}
 
 	public static void setScroll(String windowId, int value) {
-		SCROLL.put(windowId, Math.max(0, value));
+		scrollMap().put(windowId, Math.max(0, value));
 	}
 
-	public static int scrollOf(String windowId) { return SCROLL.getOrDefault(windowId, 0); }
+	public static int scrollOf(String windowId) { return scrollMap().getOrDefault(windowId, 0); }
+	public static int normalScrollOf(String windowId) { return SCROLL.getOrDefault(windowId, 0); }
+	public static TabSearch.Indicator indicatorOf(String windowId) { return INDICATORS.getOrDefault(windowId, TabSearch.Indicator.NONE); }
+	/** Entries a window showed in the last frame (oldest first): the search view while searching. */
+	public static List<MessageRecord> viewOf(String windowId) { return VIEWS.getOrDefault(windowId, List.of()); }
+	public static long renderNanosMax() { return renderNanosMax; }
+	public static double renderNanosMean() { return renderFrames == 0 ? 0 : renderNanosTotal / (double) renderFrames; }
+	public static long renderFrames() { return renderFrames; }
+	/** Bytes allocated inside {@link #render} since the last reset (diagnostics enabled only), vanilla drawing calls included. */
+	public static long renderAllocatedBytes() { return renderAllocTotal; }
+	public static void resetRenderStats() { renderNanosMax = renderNanosTotal = renderFrames = renderAllocTotal = 0; }
 	public static long tooltipFrames() { return tooltipFrames; }
 }

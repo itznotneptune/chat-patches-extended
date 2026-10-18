@@ -60,8 +60,19 @@ public final class ConfigParser {
 		String msg = String.valueOf(ex.getMessage());
 		if (ex instanceof java.nio.charset.CharacterCodingException) return "not valid UTF-8 text";
 		if (msg.startsWith("duplicate key") || msg.startsWith("trailing data") || msg.startsWith("root is")) return msg;
-		java.util.regex.Matcher m = java.util.regex.Pattern.compile("line (\\d+) column (\\d+)").matcher(msg);
-		return m.find() ? "not valid JSON at line " + m.group(1) + ", column " + m.group(2) : "not valid JSON";
+		// "... at line N column M ..." (no java.util.regex anywhere in Extended, V-46d)
+		int li = msg.indexOf("line "), ci = msg.indexOf(" column ");
+		if (li >= 0 && ci > li) {
+			String line = digits(msg, li + 5), col = digits(msg, ci + 8);
+			if (!line.isEmpty() && !col.isEmpty()) return "not valid JSON at line " + line + ", column " + col;
+		}
+		return "not valid JSON";
+	}
+
+	private static String digits(String s, int from) {
+		int end = from;
+		while (end < s.length() && Character.isDigit(s.charAt(end))) end++;
+		return s.substring(from, end);
 	}
 
 	/** Builds the understood view of an already-parsed tree (also used after in-memory edits). */

@@ -3,7 +3,6 @@ package io.github.itznotneptune.cpextended.core;
 
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 
@@ -19,6 +18,11 @@ public final class TabState {
 	/** Flagged entries; always a subset of {@link #entries}. */
 	private final java.util.Set<MessageRecord> unread = new java.util.HashSet<>();
 	private @Nullable String suspensionReason;
+	/** Bumped when entries are removed (other than the oldest), cleared or reordered: search caches rebuild. */
+	private long structureVersion;
+	/** Entries appended and oldest entries removed (cap trimming) since creation: search caches follow these incrementally. */
+	private long appended, headRemoved;
+	private @Nullable List<MessageRecord> snapshot;
 
 	TabState(String id) {
 		this.id = id;
@@ -28,7 +32,17 @@ public final class TabState {
 	public boolean isRuntimeSuspended() { return suspensionReason != null; }
 	public @Nullable String suspensionReason() { return suspensionReason; }
 	public int size() { return entries.size(); }
-	public List<MessageRecord> entries() { return new ArrayList<>(entries); }
+	public long structureVersion() { return structureVersion; }
+	public long appendedCount() { return appended; }
+	public long headRemovedCount() { return headRemoved; }
+	/** Entries newest first, without copying (client thread only). */
+	public Iterable<MessageRecord> newestFirst() { return entries.reversed(); }
+	/** Entries oldest first: an immutable snapshot, rebuilt only after a change (no per-frame copy). */
+	public List<MessageRecord> entries() {
+		List<MessageRecord> s = snapshot;
+		if (s == null) snapshot = s = List.copyOf(entries);
+		return s;
+	}
 	/** Number of retained entries flagged unread (P4: derived from the flags). */
 	public int unreadCount() { return unread.size(); }
 	public boolean isUnread(MessageRecord r) { return unread.contains(r); }
@@ -41,18 +55,31 @@ public final class TabState {
 	}
 
 	void add(MessageRecord r, boolean flagged) {
-		if (entries.add(r) && flagged) unread.add(r);
+		if (entries.add(r)) {
+			appended++;
+			snapshot = null;
+			if (flagged) unread.add(r);
+		}
 	}
 	void remove(MessageRecord r) {
-		entries.remove(r);
+		if (!entries.isEmpty() && entries.getFirst() == r) {
+			entries.removeFirst();
+			headRemoved++;
+			snapshot = null;
+		} else if (entries.remove(r)) {
+			structureVersion++;
+			snapshot = null;
+		}
 		unread.remove(r);
 	}
 	void clear() {
 		entries.clear();
 		unread.clear();
+		structureVersion++;
+		snapshot = null;
 	}
 
-	boolean contains(MessageRecord r) { return entries.contains(r); }
+	public boolean contains(MessageRecord r) { return entries.contains(r); }
 
 	/** Reorders the entries to follow {@code order} (the mirror's order); entries not in {@code order} are dropped. */
 	void reorder(Iterable<MessageRecord> order) {
@@ -61,5 +88,7 @@ public final class TabState {
 		entries.clear();
 		entries.addAll(next);
 		unread.retainAll(entries);
+		structureVersion++;
+		snapshot = null;
 	}
 }

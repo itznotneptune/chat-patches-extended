@@ -239,6 +239,36 @@ public final class ChatPatchesAdapter {
 		}
 	}
 
+	/** Chat Patches' search settings (S24); null when they can't be read (search integration then turns off, Class Q). */
+	public record SearchSettings(boolean enabled, boolean caseSensitive, boolean regex, boolean emptyShowsFullChat) {}
+
+	public @Nullable SearchSettings searchSettings() {
+		if (searchIntegrationOff) return null;
+		try {
+			ChatPatchesBackend b = backend;
+			return new SearchSettings(b.searchEnabled(), b.searchCaseSensitive(), b.searchRegex(), b.searchEmptyShowsFullChat());
+		} catch (RuntimeException | LinkageError e) {
+			failQ(Op.SEARCH_QUERY, "settings read error", e);
+			return null;
+		}
+	}
+
+	/**
+	 * Chat Patches' own regex-search result list (Q31: identity membership, never a regex in Extended); null when it
+	 * can't be read (regex-mode tab results unavailable; search integration off, Class Q).
+	 */
+	public java.util.@Nullable List<net.minecraft.client.GuiMessage> searchResults(ChatScreen screen) {
+		if (searchIntegrationOff) return null;
+		try {
+			java.util.List<net.minecraft.client.GuiMessage> r = backend.searchResults(screen);
+			if (r == null) { failQ(Op.SEARCH_QUERY, "results null", null); return null; }
+			return r;
+		} catch (RuntimeException | LinkageError e) {
+			failQ(Op.SEARCH_QUERY, "results read error", e);
+			return null;
+		}
+	}
+
 	/** Current Chat Patches search query of {@code screen}; NOT_AVAILABLE before {@code init} is not a failure. */
 	public SearchRead searchQuery(@Nullable ChatScreen screen) {
 		Field f = searchField;

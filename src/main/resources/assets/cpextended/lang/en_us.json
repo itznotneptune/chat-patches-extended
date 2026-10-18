@@ -46,5 +46,7 @@
   "cpextended.gui.switch_literal": "To Literal",
   "cpextended.gui.add_include": "+ Include",
   "cpextended.gui.add_exclude": "+ Exclude",
-  "cpextended.gui.save": "Save"
+  "cpextended.gui.save": "Save",
+  "cpextended.search.no_matches": "No matches",
+  "cpextended.search.partial": "Partial results"
 }

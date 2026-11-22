@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Private validation: the release jar in a clean production-style client (Java 21, no dev environment).
+# Private validation: the release jar in a clean production-style client (Java 25, no dev environment).
 # Usage: tools/prodtest/run-prod.sh <out-dir> [extra mod jars...]
-# The candidate is verification/<rc>/release-candidate/cpextended-<version>.jar for the version in gradle.properties
+# The candidate is verification/<rc>/release-candidate/chatpextended-<version>.jar for the version in gradle.properties
 # (RC_DIR overrides the directory).
 # Three launches of one profile: prod1 (first launch), prod2 (relaunch: restored history), prod3 (damaged settings file).
-# The acceptance-test mod (remapped to intermediary) and Fabric's published client-gametest module drive the client
+# The acceptance-test mod (Minecraft 26.x is unobfuscated: no remapping) and Fabric's published client-gametest module drive the client
 # through real input; nothing from the development run configuration is used.
 set -u
 root="$(cd "$(dirname "$0")/../.." && pwd)"; cd "$root"
@@ -13,14 +13,14 @@ extras=("$@")
 tag="base"; [ ${#extras[@]} -gt 0 ] && tag="extras"
 P="$root/build/prodtest/$tag"
 m2="$HOME/.gradle/caches/modules-2/files-2.1"
-FAPI=$(ls $m2/net.fabricmc.fabric-api/fabric-api/0.141.6+1.21.11/*/fabric-api-0.141.6+1.21.11.jar | head -1)
-CP=$(ls $m2/maven.modrinth/chatpatches/8.0.0+1.21.11-fabric/*/chatpatches-8.0.0+1.21.11-fabric.jar | head -1)
-YACL=$(ls $m2/maven.modrinth/yacl/3.8.2+1.21.11-fabric/*/yacl-3.8.2+1.21.11-fabric.jar | head -1)
-GT=$(ls $m2/net.fabricmc.fabric-api/fabric-client-gametest-api-v1/4.3.5+bfe9fcf43e/*/fabric-client-gametest-api-v1-4.3.5+bfe9fcf43e.jar | head -1)
+FAPI=$(ls $m2/net.fabricmc.fabric-api/fabric-api/0.161.0+26.2/*/fabric-api-0.161.0+26.2.jar | head -1)
+CP=$(ls $m2/maven.modrinth/chatpatches/8.0.0+26.2-fabric/*/chatpatches-8.0.0+26.2-fabric.jar | head -1)
+YACL=$(ls $m2/maven.modrinth/yacl/3.9.7+26.2-fabric/*/yacl-3.9.7+26.2-fabric.jar | head -1)
+GT=$(ls $m2/net.fabricmc.fabric-api/fabric-client-gametest-api-v1/6.0.12+131f8d475d/*/fabric-client-gametest-api-v1-6.0.12+131f8d475d.jar | head -1)
 version=$(sed -n 's/^mod_version=//p' gradle.properties)
 rcdir="${RC_DIR:-$root/verification/rc2/release-candidate}"
-RC="$rcdir/cpextended-$version.jar"
-TEST="$root/build/prodtest-jars/cpextended-$version-gametest.jar"
+RC="$rcdir/chatpextended-$version.jar"
+TEST="$root/build/prodtest-jars/chatpextended-$version-gametest.jar"
 (cd "$rcdir" && shasum -a 256 -c SHA256SUMS) || exit 1
 rm -rf "$P"; mkdir -p "$(dirname "$P")"
 python3 -I tools/prodtest/make_profile.py "$P" "$FAPI" "$CP" "$YACL" "$RC" "$GT" "$TEST" ${extras[@]+"${extras[@]}"} > "$P.profile.json" || exit 1

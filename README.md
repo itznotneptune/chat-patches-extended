@@ -8,11 +8,11 @@ Author: Neptune. License: LGPL-3.0-only (see `LICENSE` and `COPYING`).
 
 | | Version |
 |---|---|
-| Minecraft | **1.21.11** (exactly) |
+| Minecraft | **26.2** (exactly) |
 | Mod loader | Fabric Loader 0.19.5 or newer |
-| Fabric API | 0.141.6+1.21.11 or newer (lifecycle events, rendering, screen API, key bindings) |
-| Chat Patches | **8.0.0** for Fabric 1.21.11 (exactly), with its own dependencies (YACL) |
-| Java | 21 or newer |
+| Fabric API | 0.161.0+26.2 or newer (lifecycle events, rendering, screen API, key mappings) |
+| Chat Patches | **8.0.0** for Fabric 26.2 (exactly), with its own dependencies (YACL) |
+| Java | 25 or newer |
 | Mod Menu | optional (adds a settings button) |
 
 Client-side only. Other Minecraft or Chat Patches versions aren't supported, and the game refuses to start with them.

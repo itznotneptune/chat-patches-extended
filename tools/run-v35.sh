@@ -4,7 +4,7 @@
 set -u
 root="$(cd "$(dirname "$0")/.." && pwd)"; logs="$root/build/m1a-logs"; mkdir -p "$logs"
 python3 -I "$root/tools/make_v35_stubs.py" > /dev/null
-export JAVA_HOME="$(/usr/libexec/java_home -v 25)"
+[ -x /usr/libexec/java_home ] && export JAVA_HOME="$(/usr/libexec/java_home -v 25)" # macOS; elsewhere use the default JDK 25
 for v in none stub801 stub720 stub800mc stub800pre; do
   log="$logs/v35-$v.log"
   ( "$root/gradlew" -p "$root" runClientGameTest --console=plain -PcpVariant=$v > "$log" 2>&1 ) &

@@ -3,7 +3,7 @@ package io.github.itznotneptune.cpextended.gui;
 
 import io.github.itznotneptune.cpextended.config.ConfigEdit;
 import io.github.itznotneptune.cpextended.config.ConfigManager;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -49,8 +49,8 @@ abstract class BaseScreen extends Screen {
 	}
 
 	protected void confirm(Component title, Component message, Runnable onYes) {
-		minecraft.setScreen(new ConfirmScreen(yes -> {
-			minecraft.setScreen(this); // first, so onYes may open a further confirmation
+		minecraft.gui.setScreen(new ConfirmScreen(yes -> {
+			minecraft.gui.setScreen(this); // first, so onYes may open a further confirmation
 			if (yes) onYes.run();
 		}, title, message));
 	}
@@ -76,8 +76,8 @@ abstract class BaseScreen extends Screen {
 
 	/** The Q2/Q22 confirmation: restored and pruned counts; "No" changes nothing. */
 	protected void confirmOrphans(ConfigManager.OrphanCheck c, Runnable onYes) {
-		minecraft.setScreen(new ConfirmScreen(yes -> {
-			minecraft.setScreen(this);
+		minecraft.gui.setScreen(new ConfirmScreen(yes -> {
+			minecraft.gui.setScreen(this);
 			if (yes) onYes.run();
 			else setStatus("Nothing was changed", false);
 		}, Component.translatable("cpextended.gui.orphans.title"),
@@ -90,22 +90,22 @@ abstract class BaseScreen extends Screen {
 	}
 
 	@Override
-	public void render(GuiGraphics g, int mx, int my, float delta) {
-		super.render(g, mx, my, delta);
-		g.drawCenteredString(font, title, width / 2, 8, 0xFFFFFFFF);
+	public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float delta) {
+		super.extractRenderState(g, mx, my, delta);
+		g.centeredText(font, title, width / 2, 8, 0xFFFFFFFF);
 		ConfigManager m = ConfigManager.get();
 		Component state = switch (m.state()) {
 			case NORMAL -> Component.translatable("cpextended.gui.state.normal").withColor(0x80FF80);
 			case NO_SAVE -> Component.translatable("cpextended.gui.state.no_save").withColor(0xFFAA00);
 			case DIVERGENCE -> Component.translatable("cpextended.gui.state.divergence").withColor(0xFF6060);
 		};
-		g.drawCenteredString(font, state, width / 2, 20, 0xFFFFFFFF);
-		g.drawCenteredString(font, status, width / 2, height - 64, 0xFFFFFFFF);
+		g.centeredText(font, state, width / 2, 20, 0xFFFFFFFF);
+		g.centeredText(font, status, width / 2, height - 64, 0xFFFFFFFF);
 	}
 
 	@Override
 	public void onClose() {
-		minecraft.setScreen(parent);
+		minecraft.gui.setScreen(parent);
 	}
 
 	public Component status() { return status; }

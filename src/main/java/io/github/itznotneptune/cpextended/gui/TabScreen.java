@@ -9,7 +9,7 @@ import io.github.itznotneptune.cpextended.config.Labels;
 import io.github.itznotneptune.cpextended.filter.FilterSpec;
 import io.github.itznotneptune.cpextended.filter.PatternValidator;
 import io.github.itznotneptune.cpextended.model.TabConfig;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
@@ -227,13 +227,13 @@ public final class TabScreen extends BaseScreen {
 			return false;
 		}
 		if (parent instanceof BaseScreen b) b.setStatus(o.save() == ConfigManager.SaveOutcome.SAVED ? "Saved" : "Changed in game, not saved: " + o.save(), o.save() != ConfigManager.SaveOutcome.SAVED);
-		minecraft.setScreen(parent);
+		minecraft.gui.setScreen(parent);
 		return true;
 	}
 
 	@Override
-	public void render(GuiGraphics g, int mx, int my, float delta) {
-		super.render(g, mx, my, delta);
+	public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float delta) {
+		super.extractRenderState(g, mx, my, delta);
 		List<FilterRow> visible = rows.stream().filter(r -> !r.deleted).toList();
 		int per = Math.max(1, rowsPerPage() - 1);
 		int top = listTop() + ROW;
@@ -241,16 +241,16 @@ public final class TabScreen extends BaseScreen {
 			FilterRow r = visible.get(i);
 			int ry = top + (i - page * per) * ROW;
 			int x = width / 2 - 154;
-			g.drawString(font, r.list.equals("include") ? "+" : "-", x + 4, ry + 6, r.list.equals("include") ? 0xFF80FF80 : 0xFFFF8080, true);
+			g.text(font, r.list.equals("include") ? "+" : "-", x + 4, ry + 6, r.list.equals("include") ? 0xFF80FF80 : 0xFFFF8080, true);
 			if (!r.editable()) {
 				String text;
 				if (ConfigParser.MALFORMED_FILTER.equals(r.mode)) text = "Malformed entry (kept as stored)";
 				else if (!r.literal()) text = (FilterSpec.REGEX.equals(r.mode) ? "Regex (unsupported)" : "Unknown mode \"" + r.mode + "\"") + ": " + preview(r.pattern);
 				else if (r.pattern == null) text = "No pattern (kept as stored)";
 				else text = "Too long (" + r.pattern.length() + " characters), shown read-only";
-				g.drawString(font, font.plainSubstrByWidth(text, 112), x + 16, ry + 6, 0xFFFFAA55, true);
+				g.text(font, font.plainSubstrByWidth(text, 112), x + 16, ry + 6, 0xFFFFAA55, true);
 			}
-			if (r.error != null) g.drawString(font, r.error, x + 256, ry + 6, 0xFFFF6060, true);
+			if (r.error != null) g.text(font, r.error, x + 256, ry + 6, 0xFFFF6060, true);
 		}
 	}
 

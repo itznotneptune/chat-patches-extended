@@ -3,8 +3,8 @@ package io.github.itznotneptune.cpextended.core;
 
 import io.github.itznotneptune.cpextended.compat.ChatPatchesAdapter;
 import io.github.itznotneptune.cpextended.mixin.ChatComponentAccessor;
-import net.minecraft.client.GuiMessage;
-import net.minecraft.client.GuiMessageTag;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
+import net.minecraft.client.multiplayer.chat.GuiMessageTag;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.network.chat.Component;
@@ -138,7 +138,7 @@ public final class Capture {
 	public static GuiMessage devAbandonFrame(ChatComponent chat, Component message, int admissions) {
 		io.github.itznotneptune.cpextended.dev.DevHooks.requireDev();
 		enter(chat, message, null);
-		GuiMessage g = new GuiMessage(Minecraft.getInstance().gui.getGuiTicks(), message, null, null);
+		GuiMessage g = new GuiMessage(Minecraft.getInstance().gui.hud.getGuiTicks(), message, null, net.minecraft.client.multiplayer.chat.GuiMessageSource.SYSTEM_CLIENT, null);
 		if (admissions >= 1) admitDisplay(g);
 		if (admissions >= 2) admitMessages(g);
 		allMessages(chat).add(0, g);
@@ -167,7 +167,7 @@ public final class Capture {
 	 */
 	static boolean condensationDetected(CaptureFrame f) {
 		if (f.snapshot == null) return false;
-		List<GuiMessage> all = allMessages(Minecraft.getInstance().gui.getChat());
+		List<GuiMessage> all = allMessages(Minecraft.getInstance().gui.hud.getChat());
 		if (all.size() < f.sizeAtEnter) return true;
 		int window = Math.min(all.size(), f.snapshot.length + 1);
 		outer:

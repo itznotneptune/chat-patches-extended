@@ -13,14 +13,14 @@
   },
   "mixins": ["cpextended.mixins.json"],
   "depends": {
-    "java": ">=21",
-    "minecraft": "=1.21.11",
+    "java": ">=25",
+    "minecraft": "=26.2",
     "chatpatches": "=8.0.0",
     "fabricloader": ">=${loader_version}",
     "fabric-lifecycle-events-v1": ">=${lifecycle_version}",
     "fabric-rendering-v1": ">=${rendering_version}",
     "fabric-screen-api-v1": ">=${screen_version}",
-    "fabric-key-binding-api-v1": ">=${keybinding_version}"
+    "fabric-key-mapping-api-v1": ">=${keybinding_version}"
   },
   "suggests": {
     "modmenu": "*"

@@ -20,7 +20,7 @@ desc = meta.get("description", "")
 checks["unofficialNotice"] = "Unofficial" in desc and "Not affiliated" in desc
 checks["contactAbsent"] = "contact" not in meta
 dep = meta.get("depends", {})
-checks["pins"] = dep.get("minecraft") == "=1.21.11" and dep.get("chatpatches") == "=8.0.0" and dep.get("java") == ">=21"
+checks["pins"] = dep.get("minecraft") == "=26.2" and dep.get("chatpatches") == "=8.0.0" and dep.get("java") == ">=25"
 checks["loaderLowerBound"] = dep.get("fabricloader") == ">=0.19.5"
 checks["modMenuSuggestedOnly"] = meta.get("suggests", {}).get("modmenu") == "*" and "modmenu" not in dep
 
@@ -30,7 +30,7 @@ package_to_module = {
     "net.fabricmc.fabric.api.event.lifecycle": "fabric-lifecycle-events-v1",
     "net.fabricmc.fabric.api.client.rendering": "fabric-rendering-v1",
     "net.fabricmc.fabric.api.client.screen": "fabric-screen-api-v1",
-    "net.fabricmc.fabric.api.client.keybinding": "fabric-key-binding-api-v1",
+    "net.fabricmc.fabric.api.client.keymapping": "fabric-key-mapping-api-v1",
 }
 used, unknown = set(), set()
 for f in src.rglob("*.java"):
@@ -73,4 +73,4 @@ print(json.dumps({"test": "V-46d.static", "outcome": "PASS" if classes and not r
 print(json.dumps({"test": "V-64", "outcome": "PASS" if all(checks.values()) else "FAIL", "checks": checks,
                   "declaredModules": sorted(declared), "usedModules": sorted(used), "unmappedImports": sorted(unknown),
                   "loaderWarnings": warnings,
-                  "notRun": "launch with a newer Loader/API: no newer Fabric API exists for 1.21.11; Loader 0.20.0 was published 3 days before testing and wasn't adopted"}))
+                  "notRun": "launch with a newer Loader/API: not run for the 26.2 port"}))

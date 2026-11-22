@@ -14,10 +14,10 @@ import io.github.itznotneptune.cpextended.render.ChatOpenRenderer;
 import io.github.itznotneptune.cpextended.ui.HitTester;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerContext;
-import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerConnection;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerConnection;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.GuiMessage;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.ChatScreen;
@@ -57,7 +57,7 @@ final class Phase8Tests {
 
 	static String token(String s) { return Phase7bTests.token(s); }
 
-	List<GuiMessage> main() { return onClient(() -> new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()))); }
+	List<GuiMessage> main() { return onClient(() -> new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()))); }
 
 	List<String> mainTokens() { return main().stream().map(g -> token(g.content().getString())).toList(); }
 
@@ -172,16 +172,16 @@ final class Phase8Tests {
 			p3.openChat("");
 			t.waitT(10); // rendering with the mods on the restored entries
 			// Chat Patches search on the restored list
-			var f = onClient(() -> ChatPatchesAdapter.get().searchFieldWidget((ChatScreen) Minecraft.getInstance().screen));
+			var f = onClient(() -> ChatPatchesAdapter.get().searchFieldWidget((ChatScreen) Minecraft.getInstance().gui.screen()));
 			if (f != null) ctx.runOnClient(c -> f.setValue("retention 24"));
 			t.waitT(3);
-			List<String> results = onClient(() -> ((obro1961.chatpatches.accessor.ChatScreenAccess) Minecraft.getInstance().screen).getSearchResults().stream()
+			List<String> results = onClient(() -> ((obro1961.chatpatches.accessor.ChatScreenAccess) Minecraft.getInstance().gui.screen()).getSearchResults().stream()
 					.map(g -> token(g.content().getString())).toList());
 			if (f != null) ctx.runOnClient(c -> f.setValue(""));
 			// protected-region input and window input
 			ChatOpenRenderer.Layout lay = p3.layout("h-a");
 			Map<String, Object> input = onClient(() -> {
-				ChatScreen s = (ChatScreen) Minecraft.getInstance().screen;
+				ChatScreen s = (ChatScreen) Minecraft.getInstance().gui.screen();
 				int hgt = Minecraft.getInstance().getWindow().getGuiScaledHeight();
 				String inputRegion = HitTester.protectedRegion(s, 30, hgt - 7);
 				String stripRegion = lay == null ? "no layout" : String.valueOf(HitTester.protectedRegion(s, lay.strip()[0] + 2, lay.strip()[1] + 2));
@@ -197,7 +197,7 @@ final class Phase8Tests {
 			// config GUI and the optional Mod Menu entry
 			ctx.setScreen(() -> new ConfigScreen(null));
 			t.waitT(3);
-			boolean gui = onClient(() -> Minecraft.getInstance().screen instanceof ConfigScreen);
+			boolean gui = onClient(() -> Minecraft.getInstance().gui.screen() instanceof ConfigScreen);
 			ctx.setScreen(() -> null);
 			if (FabricLoader.getInstance().isModLoaded("modmenu")) {
 				modMenu = onClient(() -> {
@@ -215,7 +215,7 @@ final class Phase8Tests {
 		try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
 			t.waitT(60);
 			sw = onClient(() -> {
-				List<GuiMessage> all = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat());
+				List<GuiMessage> all = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat());
 				boolean boundaryNewest = !all.isEmpty() && Boolean.TRUE.equals(ChatPatchesAdapter.get().isBoundaryLine(all.get(0).content()));
 				TabState other = SessionMirror.get().tab("hOther");
 				return row("boundaryNewestAndExempt", boundaryNewest, "tabsKeptAcrossSwitch", other != null && other.size() > 0);
@@ -361,7 +361,7 @@ final class Phase8Tests {
 		try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
 			t.waitT(40);
 			ctx.runOnClient(c -> { ChatPatches.config.contextDeletionWarning = false; ChatPatches.config.contextDeletionSizzle = false; ChatPatches.config.contextMenu = true;
-				c.gui.getChat().clearMessages(false); });
+				c.gui.hud.getChat().clearMessages(false); });
 			for (int i = 0; i < 3; i++) t.sys(sp, "control visible " + i + " cpx#OT-c" + i);
 			t.sys(sp, "control linked cpx#OT-cl https://example.invalid/c");
 			ctx.runOnClient(c -> c.player.connection.sendChat("control player cpx#OT-cp"));
@@ -401,7 +401,7 @@ final class Phase8Tests {
 		p3.click(w.getX() + w.getWidth() / 2.0, w.getY() + w.getHeight() / 2.0, 0);
 		t.waitT(6);
 		String input = onClient(() -> {
-			if (!(Minecraft.getInstance().screen instanceof ChatScreen cs)) return null;
+			if (!(Minecraft.getInstance().gui.screen() instanceof ChatScreen cs)) return null;
 			try {
 				var fld = ChatScreen.class.getDeclaredField("input");
 				fld.setAccessible(true);
@@ -430,16 +430,16 @@ final class Phase8Tests {
 			boolean isPlayer = tok.equals(playerTok);
 			Map<String, Object> r = onClient(() -> {
 				Map<String, Object> x = new LinkedHashMap<>();
-				Object menu = fieldOfType(Minecraft.getInstance().screen, "obro1961.chatpatches.gui.ContextMenu");
+				Object menu = fieldOfType(Minecraft.getInstance().gui.screen(), "obro1961.chatpatches.gui.ContextMenu");
 				if (menu == null) { x.put("menu", "not found"); return x; }
 				GuiMessage sel = (GuiMessage) fieldOfType(menu, GuiMessage.class.getName());
 				com.mojang.authlib.GameProfile sender = (com.mojang.authlib.GameProfile) fieldOfType(menu, com.mojang.authlib.GameProfile.class.getName());
 				x.put("selected", sel == null ? null : token(sel.content().getString()));
 				x.put("sender", sender == null ? null : sender.name());
 				if (!isPlayer && sel != null) {
-					List<String> before = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()).stream().map(g -> token(g.content().getString())).toList();
+					List<String> before = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()).stream().map(g -> token(g.content().getString())).toList();
 					obro1961.chatpatches.util.ChatUtil.deleteMessage(sel, false);
-					List<String> after = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()).stream().map(g -> token(g.content().getString())).toList();
+					List<String> after = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()).stream().map(g -> token(g.content().getString())).toList();
 					x.put("cpDeleteRemoved", before.stream().filter(b -> !after.contains(b)).toList());
 				}
 				return x;
@@ -454,7 +454,7 @@ final class Phase8Tests {
 			}
 		}
 		out.put("tabsFollowLiveness", onClient(() -> SessionMirror.get().tabStates().stream().flatMap(s -> s.entries().stream())
-				.allMatch(r -> r.hidden() || AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()).contains(r.message()))));
+				.allMatch(r -> r.hidden() || AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()).contains(r.message()))));
 		return out;
 	}
 
@@ -478,7 +478,7 @@ final class Phase8Tests {
 
 	List<String> widgetLabels() {
 		return onClient(() -> {
-			Screen s = Minecraft.getInstance().screen;
+			Screen s = Minecraft.getInstance().gui.screen();
 			List<String> out = new ArrayList<>();
 			if (s != null) for (var w : s.children()) if (w instanceof AbstractWidget a) out.add(a.getMessage().getString());
 			return out;
@@ -488,9 +488,9 @@ final class Phase8Tests {
 	/** Gui point on the main-chat line showing the message with {@code tok}, using Chat Patches' own line lookup. */
 	double[] lineOf(String tok) {
 		return onClient(() -> {
-			List<GuiMessage> all = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat());
+			List<GuiMessage> all = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat());
 			for (int y = Minecraft.getInstance().getWindow().getGuiScaledHeight() - 20; y > 20; y--) {
-				int idx = ((obro1961.chatpatches.accessor.ChatComponentAccess) Minecraft.getInstance().gui.getChat()).getEoEIndex(20, y);
+				int idx = ((obro1961.chatpatches.accessor.ChatComponentAccess) Minecraft.getInstance().gui.hud.getChat()).getEoEIndex(20, y);
 				if (idx >= 0 && idx < all.size() && all.get(idx).content().getString().contains(tok)) return new double[]{20, y};
 			}
 			return null;
@@ -499,7 +499,7 @@ final class Phase8Tests {
 
 	AbstractWidget widget(String label) {
 		return onClient(() -> {
-			Screen s = Minecraft.getInstance().screen;
+			Screen s = Minecraft.getInstance().gui.screen();
 			if (s == null) return null;
 			for (var ch : s.children()) if (ch instanceof AbstractWidget a && a.getMessage().getString().trim().equals(label)) return a;
 			return null;
@@ -520,7 +520,7 @@ final class Phase8Tests {
 		t.waitT(3);
 		List<String> sameLabel = onClient(() -> {
 			List<String> out = new ArrayList<>();
-			Screen s = Minecraft.getInstance().screen;
+			Screen s = Minecraft.getInstance().gui.screen();
 			if (s != null) for (var ch : s.children()) if (ch instanceof AbstractWidget a && a.getMessage().getString().trim().equals(header))
 				out.add(a.getClass().getSimpleName() + "@" + a.getX() + "," + a.getY() + " visible=" + a.visible + " active=" + a.active);
 			return out;
@@ -532,7 +532,7 @@ final class Phase8Tests {
 			p3.cursor(head.getX() + head.getWidth() / 2.0, head.getY() + head.getHeight() / 2.0);
 			t.waitT(3);
 			target = onClient(() -> {
-				Screen s = Minecraft.getInstance().screen;
+				Screen s = Minecraft.getInstance().gui.screen();
 				for (var ch : s.children()) if (ch instanceof AbstractWidget a && a.visible && a.getMessage().getString().trim().equals(sub)) return a;
 				return null;
 			});
@@ -547,9 +547,9 @@ final class Phase8Tests {
 		p3.click(finalTarget.getX() + finalTarget.getWidth() / 2.0, finalTarget.getY() + finalTarget.getHeight() / 2.0, 0);
 		t.waitT(waitAfter);
 		String clip = onClient(() -> Minecraft.getInstance().keyboardHandler.getClipboard());
-		String screenAfter = onClient(() -> Minecraft.getInstance().screen == null ? "none" : Minecraft.getInstance().screen.getClass().getSimpleName());
+		String screenAfter = onClient(() -> Minecraft.getInstance().gui.screen() == null ? "none" : Minecraft.getInstance().gui.screen().getClass().getSimpleName());
 		String inputBox = onClient(() -> {
-			if (!(Minecraft.getInstance().screen instanceof ChatScreen cs)) return null;
+			if (!(Minecraft.getInstance().gui.screen() instanceof ChatScreen cs)) return null;
 			try {
 				var fld = ChatScreen.class.getDeclaredField("input");
 				fld.setAccessible(true);
@@ -566,7 +566,7 @@ final class Phase8Tests {
 			t.waitT(waitAfter);
 			String clip2 = onClient(() -> Minecraft.getInstance().keyboardHandler.getClipboard());
 			String input2 = onClient(() -> {
-				if (!(Minecraft.getInstance().screen instanceof ChatScreen cs)) return null;
+				if (!(Minecraft.getInstance().gui.screen() instanceof ChatScreen cs)) return null;
 				try {
 					var fld = ChatScreen.class.getDeclaredField("input");
 					fld.setAccessible(true);
@@ -583,7 +583,7 @@ final class Phase8Tests {
 		List<String> mainAfter = mainTokens();
 		List<String> removed = mainBefore.stream().filter(x -> !mainAfter.contains(x)).toList();
 		boolean tabsFollow = onClient(() -> SessionMirror.get().tabStates().stream().flatMap(s -> s.entries().stream())
-				.allMatch(r -> r.hidden() || AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()).contains(r.message())));
+				.allMatch(r -> r.hidden() || AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()).contains(r.message())));
 		Map<String, Object> out = row("clipboard", clip == null ? null : clip.length() > 160 ? clip.substring(0, 160) : clip, "inputBox", inputBox, "removedFromMainChat", removed,
 				"tabsFollowLiveness", tabsFollow, "button", row("active", finalTarget.active, "visible", finalTarget.visible, "x", finalTarget.getX(), "y", finalTarget.getY(),
 						"w", finalTarget.getWidth(), "h", finalTarget.getHeight()), "screenAfterClick", screenAfter, "diagnostic", diag, "widgetsWithLabel", sameLabel);
@@ -643,6 +643,13 @@ final class Phase8Tests {
 				"note", "a test mod adds an entry inside the same call while Chat Patches condenses: identity snapshot detects the removal; the replacement stays visible");
 	}
 
+	/** 26.2 port: a resource reload can outlast a fixed wait; wait until the loading overlay has closed (up to 60 s). */
+	private void waitForReload() {
+		t.waitT(5);
+		for (int i = 0; i < 120 && onClient(() -> Minecraft.getInstance().gui.overlay() != null); i++) t.waitT(10);
+		t.waitT(20);
+	}
+
 	void language(TestSingleplayerContext sp) {
 		Map<String, Object> m = new LinkedHashMap<>();
 		String before = onClient(() -> Minecraft.getInstance().getLanguageManager().getSelected());
@@ -652,7 +659,7 @@ final class Phase8Tests {
 			c.options.languageCode = "de_de";
 			c.reloadResourcePacks();
 		});
-		t.waitT(120);
+		waitForReload();
 		String german = onClient(() -> Component.translatable("multiplayer.player.joined", "Tester").getString());
 		String germanPart = german.replace("Tester", "").trim();
 		ctx.runOnClient(c -> mgr().edit(new ConfigEdit.SetFilter("hOther", "include", 0, io.github.itznotneptune.cpextended.filter.FilterSpec.literal(germanPart))));
@@ -667,7 +674,7 @@ final class Phase8Tests {
 			c.options.languageCode = before;
 			c.reloadResourcePacks();
 		});
-		t.waitT(120);
+		waitForReload();
 		t.sysComponent(sp, Component.translatable("multiplayer.player.joined", "Tester2"));
 		t.waitT(6);
 		boolean notRoutedEnglish = onClient(() -> SessionMirror.get().records().stream().filter(r -> r.original() != null && r.original().getString().contains("Tester2"))
@@ -683,7 +690,7 @@ final class Phase8Tests {
 		ctx.setScreen(() -> new net.minecraft.client.gui.screens.options.controls.KeyBindsScreen(null, Minecraft.getInstance().options));
 		t.waitT(5);
 		Map<String, Object> r = onClient(() -> {
-			Screen s = Minecraft.getInstance().screen;
+			Screen s = Minecraft.getInstance().gui.screen();
 			Map<String, Object> out = new LinkedHashMap<>();
 			for (var ch : s.children()) {
 				if (ch instanceof net.minecraft.client.gui.screens.options.controls.KeyBindsList list) {
@@ -784,7 +791,7 @@ final class Phase8Tests {
 		String name = onClient(() -> Minecraft.getInstance().getUser().getName());
 		try (TestDedicatedServerContext server = ctx.worldBuilder().createServer(props)) {
 			server.runCommand("op " + name);
-			try (TestServerConnection conn = server.connect()) {
+			try (TestDedicatedServerConnection conn = server.connect()) {
 				t.waitT(60);
 				boolean remote = onClient(() -> Minecraft.getInstance().getSingleplayerServer() == null && Minecraft.getInstance().getConnection() != null);
 				m.put("connectedToDedicatedServer", remote);
@@ -831,7 +838,7 @@ final class Phase8Tests {
 				// search and unread
 				int unreadHide = h.unread("hHide");
 				p3.openChat("");
-				var f = onClient(() -> ChatPatchesAdapter.get().searchFieldWidget((ChatScreen) Minecraft.getInstance().screen));
+				var f = onClient(() -> ChatPatchesAdapter.get().searchFieldWidget((ChatScreen) Minecraft.getInstance().gui.screen()));
 				ctx.runOnClient(c -> { mgr().edit(new ConfigEdit.SelectTab("h-a", "hHide2")); f.setValue("multi"); });
 				t.waitT(3);
 				List<String> view = onClient(() -> ChatOpenRenderer.viewOf("h-a").stream().map(r -> token(r.message().content().getString())).toList());
@@ -849,14 +856,14 @@ final class Phase8Tests {
 			t.waitT(10);
 			// server disconnection during ordinary chat activity: kicked while a burst is arriving
 			try {
-				try (TestServerConnection connK = server.connect()) {
+				try (TestDedicatedServerConnection connK = server.connect()) {
 					t.waitT(60);
 					server.runOnServer(srv -> {
 						for (int i = 0; i < 50; i++) srv.getPlayerList().broadcastSystemMessage(Component.literal("pre-kick " + i + " cpx#OT-k" + i), false);
 						srv.getCommands().performPrefixedCommand(srv.createCommandSourceStack(), "kick " + name + " test disconnect");
 					});
 					t.waitT(40);
-					String screenAfterKick = onClient(() -> Minecraft.getInstance().screen == null ? "none" : Minecraft.getInstance().screen.getClass().getSimpleName());
+					String screenAfterKick = onClient(() -> Minecraft.getInstance().gui.screen() == null ? "none" : Minecraft.getInstance().gui.screen().getClass().getSimpleName());
 					int keptAfterKick = onClient(() -> SessionMirror.get().tab("hOther").size());
 					long kickBurst = onClient(() -> SessionMirror.get().tab("hOther").entries().stream().filter(r -> r.original() != null && r.original().getString().contains("cpx#OT-k")).count());
 					m.put("kickDuringBurst", row("screen", screenAfterKick, "tabEntriesKept", keptAfterKick, "burstMessagesReceivedBeforeKick", kickBurst));
@@ -865,7 +872,7 @@ final class Phase8Tests {
 				m.put("kickClose", "connection already closed by the kick (expected): " + expected.getMessage());
 			}
 			// reconnect to the same server
-			try (TestServerConnection conn2 = server.connect()) {
+			try (TestDedicatedServerConnection conn2 = server.connect()) {
 				t.waitT(60);
 				server.runCommand("say after reconnect cpx#OT-mp5");
 				t.waitT(10);

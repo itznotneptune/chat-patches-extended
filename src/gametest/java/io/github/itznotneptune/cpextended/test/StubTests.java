@@ -61,11 +61,11 @@ final class StubTests {
 			notHidden = r != null && !r.hidden() && t.inMainChat(r.message());
 			ctx.setScreen(() -> new ChatScreen("", false));
 			t.waitT(5);
-			chatOpens = ctx.computeOnClient(c -> c.screen instanceof ChatScreen);
+			chatOpens = ctx.computeOnClient(c -> c.gui.screen() instanceof ChatScreen);
 			ctx.setScreen(() -> null);
 			ctx.setScreen(() -> new ConfigScreen(null));
 			t.waitT(5);
-			guiOpens = ctx.computeOnClient(c -> c.screen instanceof ConfigScreen);
+			guiOpens = ctx.computeOnClient(c -> c.gui.screen() instanceof ConfigScreen);
 			ctx.setScreen(() -> null);
 			t.local("local after stub checks cpx#ST-2");
 			t.waitT(5);

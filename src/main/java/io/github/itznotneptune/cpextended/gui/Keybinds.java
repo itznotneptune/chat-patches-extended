@@ -3,7 +3,7 @@ package io.github.itznotneptune.cpextended.gui;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import io.github.itznotneptune.cpextended.CpExtended;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.Identifier;
@@ -30,13 +30,13 @@ public final class Keybinds {
 			category = KeyMapping.Category.MISC;
 			customCategory = false;
 		}
-		openConfig = KeyBindingHelper.registerKeyBinding(new KeyMapping("key.cpextended.open_config", InputConstants.Type.KEYSYM, InputConstants.UNKNOWN.getValue(), category));
+		openConfig = KeyMappingHelper.registerKeyMapping(new KeyMapping("key.cpextended.open_config", InputConstants.Type.KEYSYM, InputConstants.UNKNOWN.getValue(), category));
 	}
 
 	/** Client tick. */
 	public static void tick(Minecraft mc) {
 		while (openConfig.consumeClick()) {
-			if (mc.screen == null && mc.level != null) mc.setScreen(new ConfigScreen(null));
+			if (mc.gui.screen() == null && mc.level != null) mc.gui.setScreen(new ConfigScreen(null));
 		}
 	}
 

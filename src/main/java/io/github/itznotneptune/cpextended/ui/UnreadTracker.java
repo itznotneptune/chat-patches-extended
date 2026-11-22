@@ -29,7 +29,7 @@ public final class UnreadTracker {
 		Minecraft mc = Minecraft.getInstance();
 		if (!cfg.enabled() || w.suspended() || !w.enabled()) return false;
 		if (mc.options.chatVisibility().get() == ChatVisiblity.HIDDEN) return false;
-		return !(mc.options.hideGui && !(mc.screen instanceof ChatScreen));
+		return !(mc.gui.hud.isHidden() && !(mc.gui.screen() instanceof ChatScreen));
 	}
 
 	static boolean readOnDelivery(String tabId) {

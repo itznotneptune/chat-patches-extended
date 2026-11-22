@@ -1,10 +1,10 @@
 plugins {
-    id("net.fabricmc.fabric-loom-remap") version "1.18.4"
+    id("net.fabricmc.fabric-loom") version "1.19.4"
 }
 
 version = project.property("mod_version") as String
 group = project.property("maven_group") as String
-base.archivesName.set("cpextended")
+base.archivesName.set("chatpextended")
 
 val minecraftVersion = project.property("minecraft_version") as String
 val loaderVersion = project.property("loader_version") as String
@@ -15,7 +15,7 @@ val cpVariant = (project.findProperty("cpVariant") as String?) ?: "real"
 
 // Fabric API modules the mod actually uses (P15, V-15). Each is declared in fabric.mod.json with a lower bound at the
 // version tested here. Nothing else from Fabric API is on the main compile classpath.
-val fabricModules = listOf("fabric-lifecycle-events-v1", "fabric-rendering-v1", "fabric-screen-api-v1", "fabric-key-binding-api-v1")
+val fabricModules = listOf("fabric-lifecycle-events-v1", "fabric-rendering-v1", "fabric-screen-api-v1", "fabric-key-mapping-api-v1")
 
 repositories {
     mavenCentral()
@@ -26,12 +26,12 @@ repositories {
 }
 
 java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+    toolchain.languageVersion.set(JavaLanguageVersion.of(25))
     withSourcesJar()
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    options.release.set(21)
+    options.release.set(25)
     options.encoding = "UTF-8"
 }
 
@@ -57,26 +57,25 @@ loom {
 
 dependencies {
     minecraft("com.mojang:minecraft:$minecraftVersion")
-    mappings(loom.officialMojangMappings())
     // -PruntimeLoader=x.y.z runs the dev environment on another Loader (V-64); the built metadata keeps loader_version.
-    modImplementation("net.fabricmc:fabric-loader:${(project.findProperty("runtimeLoader") as String?) ?: loaderVersion}")
-    for (m in fabricModules) modImplementation(fabricApi.module(m, fabricApiVersion))
+    implementation("net.fabricmc:fabric-loader:${(project.findProperty("runtimeLoader") as String?) ?: loaderVersion}")
+    for (m in fabricModules) implementation(fabricApi.module(m, fabricApiVersion))
 
     // Optional Mod Menu integration (Q20): compile-only; present at dev runtime only with -Pextras=modmenu (V-14, V-38).
-    modCompileOnly("maven.modrinth:modmenu:${project.property("modmenu_version")}")
+    compileOnly("maven.modrinth:modmenu:${project.property("modmenu_version")}")
 
     // Chat Patches is never bundled (Q5): compile against it, and vary its runtime presence for V-35.
-    modCompileOnly("maven.modrinth:chatpatches:$chatPatchesVersion")
+    compileOnly("maven.modrinth:chatpatches:$chatPatchesVersion")
 
     // Acceptance tests (gametest source set, never shipped) compile against the client gametest API.
-    "modGametestImplementation"(fabricApi.module("fabric-client-gametest-api-v1", fabricApiVersion))
+    "gametestImplementation"(fabricApi.module("fabric-client-gametest-api-v1", fabricApiVersion))
 
     // Dev runtime only. YACL (Chat Patches' dependency) requires the whole Fabric API, so the dev runtime has it.
-    modLocalRuntime("net.fabricmc.fabric-api:fabric-api:$fabricApiVersion")
+    localRuntime("net.fabricmc.fabric-api:fabric-api:$fabricApiVersion")
     when (cpVariant) {
         "real" -> {
-            modLocalRuntime("maven.modrinth:chatpatches:$chatPatchesVersion")
-            modLocalRuntime("maven.modrinth:yacl:$yaclVersion")
+            localRuntime("maven.modrinth:chatpatches:$chatPatchesVersion")
+            localRuntime("maven.modrinth:yacl:$yaclVersion")
             // YACL's nested jars aren't loaded by the dev runtime; provide them explicitly.
             localRuntime("org.quiltmc.parsers:json:0.2.1")
             localRuntime("org.quiltmc.parsers:gson:0.2.1")
@@ -92,11 +91,11 @@ dependencies {
 val extras = ((project.findProperty("extras") as String?) ?: "").split(",").filter { it.isNotBlank() }
 dependencies {
     if ("modmenu" in extras) {
-        modLocalRuntime("maven.modrinth:modmenu:${project.property("modmenu_version")}")
-        modLocalRuntime("maven.modrinth:placeholder-api:${project.property("placeholder_api_version")}")
+        localRuntime("maven.modrinth:modmenu:${project.property("modmenu_version")}")
+        localRuntime("maven.modrinth:placeholder-api:${project.property("placeholder_api_version")}")
     }
-    if ("ncr" in extras) modLocalRuntime("maven.modrinth:no-chat-reports:${project.property("ncr_version")}")
-    if ("chatheads" in extras) modLocalRuntime("maven.modrinth:chat-heads:${project.property("chatheads_version")}")
+    if ("ncr" in extras) localRuntime("maven.modrinth:no-chat-reports:${project.property("ncr_version")}")
+    if ("chatheads" in extras) localRuntime("maven.modrinth:chat-heads:${project.property("chatheads_version")}")
 }
 
 tasks.processResources {
@@ -106,7 +105,7 @@ tasks.processResources {
         "lifecycle_version" to fabricApi.moduleVersion("fabric-lifecycle-events-v1", fabricApiVersion),
         "rendering_version" to fabricApi.moduleVersion("fabric-rendering-v1", fabricApiVersion),
         "screen_version" to fabricApi.moduleVersion("fabric-screen-api-v1", fabricApiVersion),
-        "keybinding_version" to fabricApi.moduleVersion("fabric-key-binding-api-v1", fabricApiVersion),
+        "keybinding_version" to fabricApi.moduleVersion("fabric-key-mapping-api-v1", fabricApiVersion),
     )
     inputs.properties(props)
     filesMatching("fabric.mod.json") { expand(props) }
@@ -123,17 +122,10 @@ tasks.withType<AbstractArchiveTask>().configureEach {
     isReproducibleFileOrder = true
 }
 
-// Private validation only (never part of a release): the acceptance-test mod remapped to intermediary, so selected
-// modes can run inside a production-style client against the release jar (tools/prodtest).
-val gametestDevJar by tasks.registering(Jar::class) {
-    archiveClassifier.set("gametest-dev")
-    destinationDirectory.set(layout.buildDirectory.dir("prodtest-jars"))
-    from(sourceSets["gametest"].output)
-}
-val remapGametestJar by tasks.registering(net.fabricmc.loom.task.RemapJarTask::class) {
-    dependsOn(gametestDevJar)
-    inputFile.set(gametestDevJar.flatMap { it.archiveFile })
+// Private validation only (never part of a release): the acceptance-test mod as a jar, so selected modes can run inside
+// a production-style client against the release jar (tools/prodtest). Minecraft 26.x is unobfuscated, so no remapping.
+val gametestJar by tasks.registering(Jar::class) {
     archiveClassifier.set("gametest")
     destinationDirectory.set(layout.buildDirectory.dir("prodtest-jars"))
-    classpath.from(sourceSets["gametest"].compileClasspath)
+    from(sourceSets["gametest"].output)
 }

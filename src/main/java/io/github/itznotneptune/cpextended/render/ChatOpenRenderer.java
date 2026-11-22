@@ -13,7 +13,7 @@ import io.github.itznotneptune.cpextended.search.TabSearch;
 import io.github.itznotneptune.cpextended.ui.HitTester;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
@@ -28,8 +28,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The P10 chat-open path: drawn from {@code ScreenEvents.beforeRender} of the {@link ChatScreen}, followed by
- * {@code GuiGraphics.nextStratum()}, so window backgrounds and text sit beneath everything the chat screen draws (main
+ * The P10 chat-open path: drawn from {@code ScreenEvents.beforeExtract} of the {@link ChatScreen}, followed by
+ * {@code GuiGraphicsExtractor.nextStratum()}, so window backgrounds and text sit beneath everything the chat screen draws (main
  * chat lines, input, suggestions, Chat Patches' UI). Drawn under F1 (Q26); not under Chat Visibility: Hidden or for
  * disabled windows. Each window shows a tab strip (unread badges, error markers, save-lock icon), its body at full
  * opacity with independent scrolling, a scrollbar and a resize grip. The layouts drawn in a frame are what input
@@ -89,7 +89,7 @@ public final class ChatOpenRenderer {
 	}
 
 	/** beforeRender of the ChatScreen: draws every visible window back to front, then moves to the next stratum. */
-	public static void render(ChatScreen screen, GuiGraphics g, int mouseX, int mouseY) {
+	public static void render(ChatScreen screen, GuiGraphicsExtractor g, int mouseX, int mouseY) {
 		long t0 = System.nanoTime();
 		long a0 = Diagnostics.ENABLED ? allocatedBytes() : 0;
 		Minecraft mc = Minecraft.getInstance();
@@ -125,7 +125,7 @@ public final class ChatOpenRenderer {
 		return ManagementFactory.getThreadMXBean() instanceof com.sun.management.ThreadMXBean mx ? mx.getCurrentThreadAllocatedBytes() : 0;
 	}
 
-	private static Layout drawWindow(GuiGraphics g, Font font, RenderSupport.Look look, ExtendedConfig.Window w, RoutingConfig routing) {
+	private static Layout drawWindow(GuiGraphicsExtractor g, Font font, RenderSupport.Look look, ExtendedConfig.Window w, RoutingConfig routing) {
 		double scale = look.scale();
 		int lineH = look.lineHeight();
 		int[] r = RenderSupport.rect(g.guiWidth(), g.guiHeight(), w, STRIP_H + (int) Math.ceil(lineH * scale) * 2 + RenderSupport.PADDING * 2);
@@ -182,7 +182,7 @@ public final class ChatOpenRenderer {
 			if (x + sw > right) break;
 			boolean selected = tabs.get(i) == shown;
 			if (selected) g.fill(x, strip[1] + 1, x + sw, strip[1] + STRIP_H, 0x40FFFFFF);
-			g.drawString(font, labels.get(i), x + 3, strip[1] + 2, selected ? 0xFFFFFFFF : 0xFFB0B0B0, true);
+			g.text(font, labels.get(i), x + 3, strip[1] + 2, selected ? 0xFFFFFFFF : 0xFFB0B0B0, true);
 			slots.add(new TabSlot(tabs.get(i).id(), x, strip[1], sw, STRIP_H, diagnostics.get(i) != null, diagnostics.get(i)));
 			x += sw + 1;
 			last = i;
@@ -194,8 +194,8 @@ public final class ChatOpenRenderer {
 			rightArrow = new int[]{right, strip[1], ARROW_W, STRIP_H};
 			leftColor = arrowColor(first > 0, unreadCounts, diagnostics, 0, first);
 			rightColor = arrowColor(last < tabs.size() - 1, unreadCounts, diagnostics, last + 1, tabs.size());
-			g.drawString(font, "<", leftArrow[0] + 2, strip[1] + 2, leftColor, true);
-			g.drawString(font, ">", rightArrow[0] + 2, strip[1] + 2, rightColor, true);
+			g.text(font, "<", leftArrow[0] + 2, strip[1] + 2, leftColor, true);
+			g.text(font, ">", rightArrow[0] + 2, strip[1] + 2, rightColor, true);
 		}
 
 		// Save-lock icon (P14): no-save is amber, divergence lock red.
@@ -246,7 +246,7 @@ public final class ChatOpenRenderer {
 				g.pose().pushMatrix();
 				g.pose().translate(lx, ly);
 				g.pose().scale((float) scale, (float) scale);
-				g.drawString(font, seq, 0, pad, textColor, true);
+				g.text(font, seq, 0, pad, textColor, true);
 				g.pose().popMatrix();
 				lines.add(new LineSlot(lx, ly, (int) Math.round(lineH * scale), scale, seq));
 				k++;
@@ -262,7 +262,7 @@ public final class ChatOpenRenderer {
 			});
 			int nx = body[0] + body[2] - SCROLLBAR_W - 2 - font.width(note);
 			int color = view.indicator() == TabSearch.Indicator.INVALID ? 0xFFE07070 : 0xFF909090;
-			g.drawString(font, note, Math.max(body[0] + 2, nx), body[1] + 2, color, true);
+			g.text(font, note, Math.max(body[0] + 2, nx), body[1] + 2, color, true);
 		}
 
 		// Scrollbar and resize grip.
@@ -313,17 +313,17 @@ public final class ChatOpenRenderer {
 	}
 
 	/**
-	 * afterRender of the ChatScreen: Extended's own hover detection over its windows. Suppressed over protected regions
-	 * (P10). Fabric's afterRender runs after the deferred tooltip pass, so the tooltip is drawn here in a new stratum,
+	 * afterExtract of the ChatScreen: Extended's own hover detection over its windows. Suppressed over protected regions
+	 * (P10). Fabric's afterExtract runs after the deferred tooltip pass, so the tooltip is drawn here in a new stratum,
 	 * in the same frame (Phase 0 F-3).
 	 */
-	public static void renderTooltip(ChatScreen screen, GuiGraphics g, int mx, int my) {
+	public static void renderTooltip(ChatScreen screen, GuiGraphicsExtractor g, int mx, int my, float delta) {
 		String dragged = io.github.itznotneptune.cpextended.ui.ChatScreenInput.draggedTabLabel();
 		if (dragged != null) { // the tab being dragged follows the cursor, above everything
 			Font f = Minecraft.getInstance().font;
 			g.nextStratum();
 			g.fill(mx + 4, my - 2, mx + 10 + f.width(dragged), my + 10, 0xC0303030);
-			g.drawString(f, dragged, mx + 7, my, 0xFFFFFFFF, true);
+			g.text(f, dragged, mx + 7, my, 0xFFFFFFFF, true);
 			return;
 		}
 		if (HitTester.protectedRegion(screen, mx, my) != null) return;
@@ -335,8 +335,8 @@ public final class ChatOpenRenderer {
 				Style style = styleAt(font, l, mx);
 				if (style != null && style.getHoverEvent() != null) {
 					g.nextStratum();
-					g.renderComponentHoverEffect(font, style, mx, my);
-					g.renderDeferredElements();
+					((io.github.itznotneptune.cpextended.mixin.GuiGraphicsExtractorAccessor) g).cpextended$componentHoverEffect(font, style, mx, my);
+					g.extractDeferredElements(mx, my, delta);
 					tooltipFrames++;
 				}
 				return;
@@ -344,21 +344,21 @@ public final class ChatOpenRenderer {
 		}
 		for (TabSlot s : top.tabs()) {
 			if (s.contains(mx, my) && s.diagnostic() != null) {
-				tooltip(g, font, Component.literal(s.diagnostic()), mx, my);
+				tooltip(g, font, Component.literal(s.diagnostic()), mx, my, delta);
 				return;
 			}
 		}
 		if (in(top.lock(), mx, my)) {
 			ConfigManager m = ConfigManager.get();
 			tooltip(g, font, Component.literal((m.state() == ConfigManager.State.NO_SAVE ? "Saving disabled (no-save): " : "Saving disabled (divergence lock): ")
-					+ m.stateDetail()), mx, my);
+					+ m.stateDetail()), mx, my, delta);
 		}
 	}
 
-	private static void tooltip(GuiGraphics g, Font font, Component text, int mx, int my) {
+	private static void tooltip(GuiGraphicsExtractor g, Font font, Component text, int mx, int my, float delta) {
 		g.nextStratum();
 		g.setTooltipForNextFrame(font, font.split(text, 220), mx, my);
-		g.renderDeferredElements();
+		g.extractDeferredElements(mx, my, delta);
 		tooltipFrames++;
 	}
 

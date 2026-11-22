@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 package io.github.itznotneptune.cpextended.core;
 
-import net.minecraft.client.GuiMessage;
-import net.minecraft.client.GuiMessageTag;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
+import net.minecraft.client.multiplayer.chat.GuiMessageTag;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 

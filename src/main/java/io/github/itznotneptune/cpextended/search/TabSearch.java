@@ -7,7 +7,7 @@ import io.github.itznotneptune.cpextended.core.MessageRecord;
 import io.github.itznotneptune.cpextended.core.SessionMirror;
 import io.github.itznotneptune.cpextended.core.TabState;
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.GuiMessage;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.minecraft.client.gui.screens.ChatScreen;
 import org.apache.commons.lang3.Strings;
 import org.jetbrains.annotations.Nullable;

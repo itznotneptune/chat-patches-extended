@@ -4,7 +4,7 @@ package io.github.itznotneptune.cpextended.compat;
 import io.github.itznotneptune.cpextended.core.Diagnostics;
 import io.github.itznotneptune.cpextended.core.Warnings;
 import io.github.itznotneptune.cpextended.dev.DevHooks;
-import net.minecraft.client.GuiMessageTag;
+import net.minecraft.client.multiplayer.chat.GuiMessageTag;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.network.chat.Component;
@@ -258,10 +258,10 @@ public final class ChatPatchesAdapter {
 	 * Chat Patches' own regex-search result list (Q31: identity membership, never a regex in Extended); null when it
 	 * can't be read (regex-mode tab results unavailable; search integration off, Class Q).
 	 */
-	public java.util.@Nullable List<net.minecraft.client.GuiMessage> searchResults(ChatScreen screen) {
+	public java.util.@Nullable List<net.minecraft.client.multiplayer.chat.GuiMessage> searchResults(ChatScreen screen) {
 		if (searchIntegrationOff) return null;
 		try {
-			java.util.List<net.minecraft.client.GuiMessage> r = backend.searchResults(screen);
+			java.util.List<net.minecraft.client.multiplayer.chat.GuiMessage> r = backend.searchResults(screen);
 			if (r == null) { failQ(Op.SEARCH_QUERY, "results null", null); return null; }
 			return r;
 		} catch (RuntimeException | LinkageError e) {

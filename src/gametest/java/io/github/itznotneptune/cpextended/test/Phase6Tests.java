@@ -18,7 +18,7 @@ import io.github.itznotneptune.cpextended.search.TabSearch;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.GuiMessage;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.ChatScreen;
@@ -239,7 +239,7 @@ final class Phase6Tests {
 		Phase2Tests.write(Phase2Tests.cfg(), config(name));
 		ctx.runOnClient(c -> {
 			ConfigManager.get().devSimulateRestart();
-			c.options.hideGui = false;
+			HudState.setHidden(c, false);
 			c.options.chatVisibility().set(ChatVisiblity.FULL);
 		});
 		restoredTextUnit();
@@ -319,7 +319,7 @@ final class Phase6Tests {
 			TabState s = SessionMirror.get().tab("rAngle");
 			long restored = s == null ? 0 : s.entries().stream().filter(r -> r.origin() == Origin.RESTORED).count();
 			long live = s == null ? 0 : s.entries().stream().filter(r -> r.origin() != Origin.RESTORED).count();
-			int now = Minecraft.getInstance().gui.getGuiTicks();
+			int now = Minecraft.getInstance().gui.hud.getGuiTicks();
 			long inFadeWindow = s == null ? 0 : s.entries().stream().filter(r -> now - r.message().addedTime() < 200).count();
 			return row("restoredEntries", restored, "liveEntries", live, "entriesInsideVanillaFadeWindow", inFadeWindow, "hudLines", WindowRenderer.hudLinesDrawn("r-filters"),
 					"selectedTab", ConfigManager.get().config().window("r-filters").selectedTab());
@@ -339,7 +339,7 @@ final class Phase6Tests {
 		long restoredRecords = onClient(() -> SessionMirror.get().records().stream().filter(r -> r.origin() == Origin.RESTORED).count());
 		long mainRestored = onClient(() -> {
 			var tag = ChatPatchesAdapter.get().restoredTag();
-			return AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()).stream().filter(g -> g.tag() == tag).count();
+			return AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()).stream().filter(g -> g.tag() == tag).count();
 		});
 		long liveMislabelled = onClient(() -> SessionMirror.get().records().stream().filter(r -> r.origin() == Origin.RESTORED && r.message().content().getString().contains("cpx#R-live")).count());
 		long liveDuring = onClient(() -> SessionMirror.get().records().stream().filter(r -> r.origin() == Origin.LIVE && r.message().content().getString().contains("cpx#R-live")).count());
@@ -409,7 +409,7 @@ final class Phase6Tests {
 
 	/** Client thread only. */
 	static boolean inMain(GuiMessage g) {
-		for (GuiMessage x : AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat())) if (x == g) return true;
+		for (GuiMessage x : AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat())) if (x == g) return true;
 		return false;
 	}
 
@@ -488,7 +488,7 @@ final class Phase6Tests {
 		Map<String, Object> m = new LinkedHashMap<>();
 		boolean ok = onClient(() -> {
 			boolean good = true;
-			List<GuiMessage> main = new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat())).reversed();
+			List<GuiMessage> main = new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat())).reversed();
 			Map<GuiMessage, Integer> pos = new java.util.IdentityHashMap<>();
 			for (int i = 0; i < main.size(); i++) pos.put(main.get(i), i);
 			for (TabState s : SessionMirror.get().tabStates()) {
@@ -540,7 +540,7 @@ final class Phase6Tests {
 	void searchRestored(TestSingleplayerContext sp) {
 		Map<String, Object> m = new LinkedHashMap<>();
 		p3.openChat("");
-		EditBox f = onClient(() -> ChatPatchesAdapter.get().searchFieldWidget((ChatScreen) Minecraft.getInstance().screen));
+		EditBox f = onClient(() -> ChatPatchesAdapter.get().searchFieldWidget((ChatScreen) Minecraft.getInstance().gui.screen()));
 		ctx.runOnClient(c -> f.setValue("system restored"));
 		t.waitT(2);
 		List<String> plain = onClient(() -> ChatOpenRenderer.viewOf("r-main").stream().map(r -> token(r.message().content().getString())).toList());
@@ -590,12 +590,12 @@ final class Phase6Tests {
 			for (int i = 0; i < 45; i++) t.sys(sp, "prune filler " + i + " cpx#R-p" + i);
 			t.waitT(10);
 			Map<String, Object> pr = onClient(() -> {
-				int main = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()).size();
+				int main = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()).size();
 				long restoredLeft = SessionMirror.get().tab("rAll").entries().stream().filter(r -> r.origin() == Origin.RESTORED).count();
 				long notInMain = SessionMirror.get().tabStates().stream().flatMap(s -> s.entries().stream()).filter(r -> !inMain(r.message())).count();
 				return row("mainChatSize", main, "restoredLeftInRAll", restoredLeft, "tabEntriesNotInMainChat", notInMain, "rAllSize", SessionMirror.get().tab("rAll").size());
 			});
-			ctx.runOnClient(c -> c.gui.getChat().clearMessages(false));
+			ctx.runOnClient(c -> c.gui.hud.getChat().clearMessages(false));
 			t.waitT(10);
 			long afterClear = onClient(() -> SessionMirror.get().tabStates().stream().mapToLong(TabState::size).sum());
 			ctx.runOnClient(c -> ChatPatches.config.chatMaxMessages = 16384);
@@ -608,14 +608,14 @@ final class Phase6Tests {
 	/** Client thread only. */
 	static int boundaryCount() {
 		int n = 0;
-		for (GuiMessage g : AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()))
+		for (GuiMessage g : AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()))
 			if (Boolean.TRUE.equals(ChatPatchesAdapter.get().isBoundaryLine(g.content()))) n++;
 		return n;
 	}
 
 	Map<String, Object> boundaryState() {
 		return onClient(() -> {
-			List<GuiMessage> main = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat());
+			List<GuiMessage> main = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat());
 			GuiMessage newest = main.isEmpty() ? null : main.get(0);
 			boolean isB = newest != null && Boolean.TRUE.equals(ChatPatchesAdapter.get().isBoundaryLine(newest.content()));
 			MessageRecord rec = null;

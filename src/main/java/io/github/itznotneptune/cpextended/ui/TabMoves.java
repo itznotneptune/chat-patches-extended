@@ -48,7 +48,7 @@ public final class TabMoves {
 		if (w == null) return;
 		if (!tabId.equals(w.selectedTab())) m.edit(new ConfigEdit.SelectTab(windowId, tabId));
 		w = m.config().window(windowId);
-		boolean chatOpen = net.minecraft.client.Minecraft.getInstance().screen instanceof net.minecraft.client.gui.screens.ChatScreen;
+		boolean chatOpen = net.minecraft.client.Minecraft.getInstance().gui.screen() instanceof net.minecraft.client.gui.screens.ChatScreen;
 		boolean visible = chatOpen ? ChatOpenRenderer.drawnWithChatOpen(m.config(), w) : UnreadTracker.visibleForUnread(m.config(), w);
 		if (visible) {
 			TabState st = SessionMirror.get().tab(tabId);

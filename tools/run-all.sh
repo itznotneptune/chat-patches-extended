@@ -4,7 +4,7 @@
 set -u
 root="$(cd "$(dirname "$0")/.." && pwd)"; cd "$root"
 run="build/run/clientGameTest"; logs="build/m1a-logs"; out="${1:-verification/rc2}"
-export JAVA_HOME="$(/usr/libexec/java_home -v 25)"
+[ -x /usr/libexec/java_home ] && export JAVA_HOME="$(/usr/libexec/java_home -v 25)" # macOS; elsewhere use the default JDK 25
 rm -rf build/run build/libs "$logs" "$out"; mkdir -p "$run" "$logs" "$out/evidence" "$out/logs"
 
 echo "== build"; ./gradlew build --console=plain > "$logs/build.log" 2>&1; echo "build exit=$?"
@@ -119,7 +119,7 @@ rm -f "$run"/cpx-evidence/rc2_kill_[a-z]*.jsonl; cp "$run"/cpx-evidence/rc2_kill
 cp "$run"/cpx-evidence/*.jsonl "$run"/cpx-evidence/*-mainchat.txt "$run"/cpx-evidence/*-chatlog.json "$out/evidence/" 2>/dev/null
 cp "$logs/compileClasspath.txt" "$out/evidence/"
 mkdir -p "$out/evidence/screenshots" && cp "$run"/screenshots/*p2-hud-*.png "$run"/screenshots/*p3-*.png "$run"/screenshots/*p4-*.png "$run"/screenshots/*p5-*.png "$run"/screenshots/*p6-*.png "$run"/screenshots/*p8-*.png "$run"/screenshots/*rc2-*.png "$out/evidence/screenshots/" 2>/dev/null
-jar=$(ls build/libs/cpextended-*.jar | grep -v sources | head -1)
+jar=$(ls build/libs/chatpextended-*.jar | grep -v sources | head -1)
 unzip -p "$jar" fabric.mod.json > "$out/evidence/release-fabric.mod.json"
 unzip -l "$jar" | awk 'NR>3 {print $4}' | grep -v '^$' > "$out/evidence/release-jar-contents.txt"
 for f in "$logs"/*.log; do

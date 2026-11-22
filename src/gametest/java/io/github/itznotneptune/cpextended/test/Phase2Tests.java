@@ -306,7 +306,7 @@ final class Phase2Tests {
 		// Chat Patches itself can't write a log containing a lone surrogate (UnmappableCharacterException in its save);
 		// remove that synthetic message through Chat Patches so its log keeps saving for the rest of the run.
 		ctx.runOnClient(c -> {
-			for (var g : AcceptanceTest.allMessagesReflective(c.gui.getChat())) {
+			for (var g : AcceptanceTest.allMessagesReflective(c.gui.hud.getChat())) {
 				if (g.content().getString().contains("cpx#F25-3")) { obro1961.chatpatches.util.ChatUtil.deleteMessage(g, false); break; }
 			}
 		});
@@ -762,7 +762,7 @@ final class Phase2Tests {
 		try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
 			t.waitT(40);
 			ctx.runOnClient(c -> {
-				c.options.hideGui = false;
+				HudState.setHidden(c, false);
 				c.options.chatVisibility().set(ChatVisiblity.FULL);
 			});
 			for (int i = 0; i < 6; i++) t.sys(sp, "main chat filler line " + i + " lorem ipsum dolor sit amet");
@@ -778,10 +778,10 @@ final class Phase2Tests {
 			t.waitT(10);
 			long visibleFrames = WindowRenderer.framesWithDraws();
 			Map<String, Integer> lastFrame = WindowRenderer.drawsInLastFrame();
-			ctx.runOnClient(c -> { c.options.hideGui = true; WindowRenderer.resetCounters(); });
+			ctx.runOnClient(c -> { HudState.setHidden(c, true); WindowRenderer.resetCounters(); });
 			t.waitT(10);
 			long f1Frames = WindowRenderer.framesWithDraws();
-			ctx.runOnClient(c -> { c.options.hideGui = false; c.options.chatVisibility().set(ChatVisiblity.HIDDEN); WindowRenderer.resetCounters(); });
+			ctx.runOnClient(c -> { HudState.setHidden(c, false); c.options.chatVisibility().set(ChatVisiblity.HIDDEN); WindowRenderer.resetCounters(); });
 			t.waitT(10);
 			long hiddenFrames = WindowRenderer.framesWithDraws();
 			ctx.setScreen(() -> new ChatScreen("", false));
@@ -802,15 +802,15 @@ final class Phase2Tests {
 			TestCounters.expectedVisible = () -> {
 				Minecraft c = Minecraft.getInstance();
 				// Phase 3 rule: the chat-open path draws while chat is open, even under F1 (Q26); the HUD path otherwise.
-				return c.level != null && c.options.chatVisibility().get() != ChatVisiblity.HIDDEN && (c.screen instanceof ChatScreen || !c.options.hideGui);
+				return c.level != null && c.options.chatVisibility().get() != ChatVisiblity.HIDDEN && (c.gui.screen() instanceof ChatScreen || !c.gui.hud.isHidden());
 			};
 			t.waitT(1);
 			TestCounters.ANOMALY_SAMPLES.clear();
 			int a0 = TestCounters.ANOMALIES.get(), f0 = TestCounters.FRAMES.get();
 			for (int i = 0; i < 40; i++) { ctx.setScreen(() -> new ChatScreen("", false)); t.waitT(1 + i % 2); ctx.setScreen(() -> null); t.waitT(1 + i % 3); }
-			ctx.runOnClient(c -> c.options.hideGui = true);
+			ctx.runOnClient(c -> HudState.setHidden(c, true));
 			for (int i = 0; i < 20; i++) { ctx.setScreen(() -> new ChatScreen("", false)); t.waitT(2); ctx.setScreen(() -> null); t.waitT(2); }
-			ctx.runOnClient(c -> { c.options.hideGui = false; c.options.chatVisibility().set(ChatVisiblity.HIDDEN); });
+			ctx.runOnClient(c -> { HudState.setHidden(c, false); c.options.chatVisibility().set(ChatVisiblity.HIDDEN); });
 			for (int i = 0; i < 10; i++) { ctx.setScreen(() -> new ChatScreen("", false)); t.waitT(2); ctx.setScreen(() -> null); t.waitT(2); }
 			ctx.runOnClient(c -> c.options.chatVisibility().set(ChatVisiblity.FULL));
 			for (int i = 0; i < 5; i++) { ctx.setScreen(() -> new ChatScreen("", false)); t.waitT(2); ctx.setScreen(() -> null); t.waitT(2); }
@@ -841,7 +841,7 @@ final class Phase2Tests {
 			BufferedImage gameplay = ImageIO.read(ctx.takeScreenshot("p2-hud-gameplay").toFile());
 			int[] over = WindowRenderer.lastRect("h-overchat");
 			double scale = gameplay.getWidth() / (double) screen[0];
-			int[] mainChat = ctx.computeOnClient(c -> new int[]{0, screen[1] - 40 - (int) (c.gui.getChat().getLinesPerPage() * 9 * c.options.chatScale().get()), 320, screen[1] - 40});
+			int[] mainChat = ctx.computeOnClient(c -> new int[]{0, screen[1] - 40 - (int) (c.gui.hud.getChat().getLinesPerPage() * 9 * c.options.chatScale().get()), 320, screen[1] - 40});
 			int pureInOverlap = countPure(gameplay, scale, intersect(over, mainChat));
 			ev.result("V-53.gameplayAboveChatHud", pureInOverlap > 0, "overlapRect", Arrays.toString(intersect(over, mainChat)), "pureMagentaWindowTextPixels", pureInOverlap,
 					"screenshot", "p2-hud-gameplay");

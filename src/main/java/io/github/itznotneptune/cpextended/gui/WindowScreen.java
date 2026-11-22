@@ -69,7 +69,7 @@ public final class WindowScreen extends BaseScreen {
 			ExtendedConfig.Tab t = tabs.get(i);
 			int ry = listTop() + (i - page * per) * ROW;
 			String tabId = t.id();
-			Button open = addRenderableWidget(Button.builder(Component.literal(label(t)), b -> minecraft.setScreen(new TabScreen(this, tabId)))
+			Button open = addRenderableWidget(Button.builder(Component.literal(label(t)), b -> minecraft.gui.setScreen(new TabScreen(this, tabId)))
 					.bounds(width / 2 - 154, ry, 150, 20).build());
 			open.active = tabId != null && t.config() != null;
 			String target = moveTargets.getOrDefault(String.valueOf(tabId), others.isEmpty() ? null : others.get(0));
@@ -97,7 +97,7 @@ public final class WindowScreen extends BaseScreen {
 			// P5: an empty window is deleted directly (after confirmation); a nonempty one needs a move-or-delete choice per tab
 			if (window().tabs().isEmpty()) confirm(Component.translatable("cpextended.gui.delete_window"),
 					Component.translatable("cpextended.gui.delete_window.confirm", Labels.window(windowId)), this::deleteWindow);
-			else minecraft.setScreen(new DeleteWindowScreen(this, windowId));
+			else minecraft.gui.setScreen(new DeleteWindowScreen(this, windowId));
 		}).bounds(width / 2 - 50, height - 28, 100, 20).build());
 		addRenderableWidget(Button.builder(Component.translatable("gui.back"), b -> onClose()).bounds(width / 2 + 54, height - 28, 100, 20).build());
 	}
@@ -135,7 +135,7 @@ public final class WindowScreen extends BaseScreen {
 		String id = m.unusedId("tab");
 		ConfigManager.EditOutcome o = m.edit(new ConfigEdit.AddTab(windowId, id, "New tab"));
 		report(o);
-		if (o.applied()) minecraft.setScreen(new TabScreen(this, id));
+		if (o.applied()) minecraft.gui.setScreen(new TabScreen(this, id));
 		else rebuildWidgets();
 	}
 
@@ -148,9 +148,9 @@ public final class WindowScreen extends BaseScreen {
 		report(o);
 		if (o.applied()) {
 			if (parent instanceof BaseScreen b) b.setStatus(Labels.window(windowId) + " deleted", false);
-			minecraft.setScreen(parent);
+			minecraft.gui.setScreen(parent);
 		} else {
-			minecraft.setScreen(this);
+			minecraft.gui.setScreen(this);
 		}
 	}
 

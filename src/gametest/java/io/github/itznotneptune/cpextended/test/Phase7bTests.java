@@ -18,7 +18,7 @@ import io.github.itznotneptune.cpextended.render.ChatOpenRenderer;
 import io.github.itznotneptune.cpextended.search.TabSearch;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
-import net.minecraft.client.GuiMessage;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.gui.screens.ChatScreen;
@@ -105,7 +105,7 @@ final class Phase7bTests {
 			try {
 				Field f = ChatComponent.class.getDeclaredField("trimmedMessages");
 				f.setAccessible(true);
-				@SuppressWarnings("unchecked") List<GuiMessage.Line> l = (List<GuiMessage.Line>) f.get(Minecraft.getInstance().gui.getChat());
+				@SuppressWarnings("unchecked") List<GuiMessage.Line> l = (List<GuiMessage.Line>) f.get(Minecraft.getInstance().gui.hud.getChat());
 				for (GuiMessage.Line line : l) if (Phase7aTests.text(line.content()).contains(text)) return true;
 				return false;
 			} catch (ReflectiveOperationException e) {
@@ -144,8 +144,8 @@ final class Phase7bTests {
 			mgr().devSimulateRestart();
 			AcceptanceTest.resetChatPatchesConfig();
 			ChatPatches.config.chatMaxMessages = 16384;
-			c.options.hideGui = false;
-			c.gui.getChat().clearMessages(false);
+			HudState.setHidden(c, false);
+			c.gui.hud.getChat().clearMessages(false);
 		});
 		t.waitT(3);
 	}
@@ -247,10 +247,10 @@ final class Phase7bTests {
 		ctx.runOnClient(c -> mgr().edit(new ConfigEdit.SetWindowEnabled("h-dis", true)));
 		send(sp, "re-enabled cpx#DW-2");
 		MessageRecord d2 = rec("cpx#DW-2");
-		ctx.runOnClient(c -> c.options.hideGui = true);
+		ctx.runOnClient(c -> HudState.setHidden(c, true));
 		send(sp, "under F1 cpx#DW-3");
 		MessageRecord d3 = rec("cpx#DW-3");
-		ctx.runOnClient(c -> c.options.hideGui = false);
+		ctx.runOnClient(c -> HudState.setHidden(c, false));
 		boolean ok = h0.hidden() && d1 != null && !d1.hidden() && inMain(d1) && d1.tabIds().contains("hDisWin") && tabTokens("hDisWin").contains("cpx#DW-0")
 				&& noPrompt && d2.hidden() && d3.hidden() && inMain(d1);
 		ev.result("V-45", ok, "hiddenBeforeDisable", h0.hidden(), "whileDisabled", row("hidden", d1.hidden(), "inMainChat", inMain(d1), "receivedByTab", d1.tabIds()),
@@ -340,9 +340,9 @@ final class Phase7bTests {
 			send(sp, "filler a cpx#OT-a" + n);
 			send(sp, "filler b cpx#OT-b" + n);
 			ctx.runOnClient(x -> mgr().edit(new ConfigEdit.SetTabFlag("hCond", "hideFromMainChat", true)));
-			List<GuiMessage> before = onClient(() -> new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat())));
+			List<GuiMessage> before = onClient(() -> new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat())));
 			send(sp, "variant " + tok);
-			List<GuiMessage> after = onClient(() -> new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat())));
+			List<GuiMessage> after = onClient(() -> new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat())));
 			boolean removed = before.stream().anyMatch(g -> g.content().getString().contains(tok) && after.stream().noneMatch(a -> a == g));
 			MessageRecord newest = rec(tok);
 			boolean newVisible = newest != null && !newest.hidden() && inMain(newest);
@@ -381,7 +381,7 @@ final class Phase7bTests {
 		m.put("9.failedWriteNothingPartial", row("applied", failed.applied(), "unchanged", after.diff(before)));
 		ConfigManager.OrphanCheck c2 = onClient(() -> mgr().checkEdits(List.of(new ConfigEdit.DeleteTab("hHide"))));
 		ConfigManager.EditOutcome ok = onClient(() -> mgr().editAllRestoringOrphans(List.of(new ConfigEdit.DeleteTab("hHide")), c2));
-		List<String> main = onClient(() -> AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()).stream().map(g -> token(g.content().getString())).toList());
+		List<String> main = onClient(() -> AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()).stream().map(g -> token(g.content().getString())).toList());
 		int iA = main.indexOf("cpx#P-a"), i1 = main.indexOf("cpx#HD-o1"), iB = main.indexOf("cpx#P-b"), i2 = main.indexOf("cpx#HD-o2"), iS = main.indexOf("cpx#HD2-s");
 		boolean order = i2 >= 0 && iS >= 0 && iS < i2 && i2 < iB && iB < i1 && i1 < iA;
 		boolean noDup = main.stream().filter(x -> x.equals("cpx#HD-o1")).count() == 1 && onClient(() -> SessionMirror.get().hiddenRecords().stream().noneMatch(r -> r.original().getString().contains("cpx#HD-o")));
@@ -399,7 +399,7 @@ final class Phase7bTests {
 		ctx.runOnClient(c -> mgr().edit(new ConfigEdit.SetWindowEnabled("h-dis", false)));
 		for (int i = 0; i < 60; i++) t.sys(sp, "cap " + i + " cpx#HD-c" + i + (i % 3 == 0 ? " cpx#DW cpx#DT" : ""));
 		t.waitT(10);
-		List<GuiMessage> mainBefore = onClient(() -> new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat())));
+		List<GuiMessage> mainBefore = onClient(() -> new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat())));
 		List<String> hidden = onClient(() -> SessionMirror.get().hiddenRecords().stream().map(r -> token(r.original().getString())).toList());
 		boolean oldestFirst = hidden.size() == 50 && hidden.get(0).equals("cpx#HD-c10") && hidden.get(49).equals("cpx#HD-c59");
 		boolean goneEverywhere = onClient(() -> SessionMirror.get().tabStates().stream().flatMap(s -> s.entries().stream())
@@ -421,7 +421,7 @@ final class Phase7bTests {
 		boolean noResurrection = onClient(() -> SessionMirror.get().hiddenRecords().stream().noneMatch(r -> r.original().getString().contains("cpx#HD-c1 ")
 				|| r.original().getString().matches(".*cpx#HD-c(1[0-9]|2[0-9]) .*")));
 		boolean mainUntouched = onClient(() -> {
-			List<GuiMessage> now = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat());
+			List<GuiMessage> now = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat());
 			return mainBefore.stream().allMatch(g -> now.stream().anyMatch(x -> x == g));
 		});
 		boolean noPrompt = Warnings.counts().keySet().stream().noneMatch(k -> k.contains("orphan"));
@@ -463,7 +463,7 @@ final class Phase7bTests {
 			// fails twice, then succeeds: degraded must not flip back
 			ChatPatchesBackend flaky = new Phase3Tests.DelegatingBackend(real) {
 				boolean fail() { return calls[0]++ < 2; }
-				@Override public net.minecraft.client.GuiMessageTag restoredIndicator() { if (op.equals("restoredTag") && fail()) throw new IllegalStateException("t"); return real.restoredIndicator(); }
+				@Override public net.minecraft.client.multiplayer.chat.GuiMessageTag restoredIndicator() { if (op.equals("restoredTag") && fail()) throw new IllegalStateException("t"); return real.restoredIndicator(); }
 				@Override public boolean vanillaClearing() { if (op.equals("vanillaClearing") && fail()) throw new IllegalStateException("t"); return real.vanillaClearing(); }
 				@Override public int chatMaxMessages() { if (op.equals("chatMaxMessages") && fail()) throw new IllegalStateException("t"); return real.chatMaxMessages(); }
 				@Override public boolean isBoundaryLine(Component c) { if (op.equals("isBoundaryLine") && fail()) throw new IllegalStateException("t"); return real.isBoundaryLine(c); }
@@ -493,7 +493,7 @@ final class Phase7bTests {
 		int unreadHide = unread("hHide");
 		ctx.runOnClient(c -> mgr().edit(new ConfigEdit.SelectTab("h-a", "hHide")));
 		p3.openChat("");
-		var f = onClient(() -> ChatPatchesAdapter.get().searchFieldWidget((ChatScreen) Minecraft.getInstance().screen));
+		var f = onClient(() -> ChatPatchesAdapter.get().searchFieldWidget((ChatScreen) Minecraft.getInstance().gui.screen()));
 		ctx.runOnClient(c -> f.setValue("apple"));
 		t.waitT(2);
 		List<String> plain = onClient(() -> ChatOpenRenderer.viewOf("h-a").stream().map(r -> token(r.message().content().getString())).toList());
@@ -511,7 +511,7 @@ final class Phase7bTests {
 		ctx.runOnClient(c -> mgr().edit(new ConfigEdit.SetWindowEnabled("h-a", false)));
 		send(sp, "melon hidden cpx#HD-s4");
 		p3.openChat("");
-		var f2 = onClient(() -> ChatPatchesAdapter.get().searchFieldWidget((ChatScreen) Minecraft.getInstance().screen));
+		var f2 = onClient(() -> ChatPatchesAdapter.get().searchFieldWidget((ChatScreen) Minecraft.getInstance().gui.screen()));
 		ctx.runOnClient(c -> f2.setValue("apple"));
 		t.waitT(2);
 		int flagged = unread("hHide");
@@ -551,11 +551,11 @@ final class Phase7bTests {
 		p3.openChat("");
 		t.waitT(2);
 		Map<String, Object> hit = onClient(() -> {
-			List<GuiMessage> all = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat());
+			List<GuiMessage> all = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat());
 			Map<String, Object> r = new LinkedHashMap<>();
 			int found = 0;
 			for (int y = Minecraft.getInstance().getWindow().getGuiScaledHeight() - 20; y > 20 && found < 6; y--) {
-				int idx = ((obro1961.chatpatches.accessor.ChatComponentAccess) Minecraft.getInstance().gui.getChat()).getEoEIndex(10, y);
+				int idx = ((obro1961.chatpatches.accessor.ChatComponentAccess) Minecraft.getInstance().gui.hud.getChat()).getEoEIndex(10, y);
 				if (idx < 0 || idx >= all.size()) continue;
 				String tok = token(all.get(idx).content().getString());
 				if (!r.containsValue(tok)) r.put("line" + found++, tok);
@@ -571,7 +571,7 @@ final class Phase7bTests {
 	/** V-22 with hiding: the same script twice gives the same routing, hidden flags and unread. */
 	void v22(TestSingleplayerContext sp) {
 		List<String> run1 = script(sp);
-		ctx.runOnClient(c -> c.gui.getChat().clearMessages(false));
+		ctx.runOnClient(c -> c.gui.hud.getChat().clearMessages(false));
 		t.waitT(3);
 		List<String> run2 = script(sp);
 		ev.result("V-22.hiding", run1.equals(run2), "run1", run1, "run2", run2);
@@ -606,14 +606,14 @@ final class Phase7bTests {
 		List<String> before = tabTokens("hRun2");
 		// Chat Patches' context-menu delete removes the entry from the main chat (as Chat Patches does), then liveness
 		ctx.runOnClient(c -> {
-			var all = AcceptanceTest.allMessagesReflective(c.gui.getChat());
+			var all = AcceptanceTest.allMessagesReflective(c.gui.hud.getChat());
 			all.removeIf(g -> g.content().getString().contains("cpx#RM-v1"));
-			c.gui.getChat().rescaleChat();
+			c.gui.hud.getChat().rescaleChat();
 		});
 		t.waitT(3);
 		List<String> afterDelete = tabTokens("hRun2");
 		int unreadAll = unread("hRun2");
-		ctx.runOnClient(c -> c.gui.getChat().clearMessages(false));
+		ctx.runOnClient(c -> c.gui.hud.getChat().clearMessages(false));
 		t.waitT(3);
 		int hiddenAfterClear = onClient(() -> SessionMirror.get().hiddenSize());
 		long tabEntriesAfterClear = onClient(() -> SessionMirror.get().tabStates().stream().mapToLong(TabState::size).sum());
@@ -634,11 +634,11 @@ final class Phase7bTests {
 	/** Explicit check 12: the main chat lacks exactly the hidden messages; Chat Patches' log has all of them. */
 	void logDifferences(TestSingleplayerContext sp) {
 		int log0 = onClient(ChatLog::messageCount);
-		int main0 = onClient(() -> AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()).size());
+		int main0 = onClient(() -> AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()).size());
 		String[] msgs = {"log a cpx#HD-l1", "log b cpx#OT-l2", "log c cpx#HD-l3", "log d cpx#OT-l4"};
 		for (String s : msgs) send(sp, s);
 		int log1 = onClient(ChatLog::messageCount);
-		int main1 = onClient(() -> AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()).size());
+		int main1 = onClient(() -> AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()).size());
 		boolean ok = log1 - log0 == 4 && main1 - main0 == 2;
 		ev.result("Hide.mainChatVsLog", ok, "chatLogAdded", log1 - log0, "mainChatAdded", main1 - main0,
 				"note", "hidden messages are logged by Chat Patches (D2) and absent from the main chat; the structural hiding-on baseline compares full contents (structural.hidingOnBaseline)");
@@ -669,7 +669,7 @@ final class Phase7bTests {
 		try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
 			t.waitT(60);
 			Map<String, Object> st = onClient(() -> {
-				List<GuiMessage> all = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat());
+				List<GuiMessage> all = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat());
 				GuiMessage newest = all.isEmpty() ? null : all.get(0);
 				boolean isB = newest != null && Boolean.TRUE.equals(ChatPatchesAdapter.get().isBoundaryLine(newest.content()));
 				boolean unrouted = SessionMirror.get().records().stream().filter(r -> Boolean.TRUE.equals(ChatPatchesAdapter.get().isBoundaryLine(r.message().content())))
@@ -709,12 +709,12 @@ final class Phase7bTests {
 			t.waitT(6);
 			rec.put("hiddenRetained", onClient(() -> SessionMirror.get().hiddenRecords().stream().map(r -> token(r.original().getString())).toList()));
 			// V-20f: delete hHide: the 40 orphans return, the main chat cap (40) prunes the 30 older visible messages
-			List<String> before = onClient(() -> AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()).stream().map(g -> token(g.content().getString())).toList());
+			List<String> before = onClient(() -> AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()).stream().map(g -> token(g.content().getString())).toList());
 			ConfigManager.OrphanCheck c = onClient(() -> mgr().checkEdits(List.of(new ConfigEdit.DeleteTab("hHide"))));
 			rec.put("restoreDisclosure", row("refused", c.refused(), "message", c.refusal(), "restored", c.restored(), "pruned", c.pruned()));
 			if (!c.refused()) {
 				ConfigManager.EditOutcome o = onClient(() -> mgr().editAllRestoringOrphans(List.of(new ConfigEdit.DeleteTab("hHide")), c));
-				List<String> after = onClient(() -> AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()).stream().map(g -> token(g.content().getString())).toList());
+				List<String> after = onClient(() -> AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()).stream().map(g -> token(g.content().getString())).toList());
 				List<String> pruned = before.stream().filter(x -> !after.contains(x)).toList();
 				rec.put("restoreApplied", o.applied());
 				rec.put("prunedActual", pruned);
@@ -739,7 +739,7 @@ final class Phase7bTests {
 			mgr().devSimulateRestart();
 			if (fault) {
 				ChatPatchesAdapter.get().devReplaceBackend(new Phase3Tests.DelegatingBackend(real) {
-					@Override public net.minecraft.client.GuiMessageTag restoredIndicator() { throw new IllegalStateException("test: restored tag unreadable"); }
+					@Override public net.minecraft.client.multiplayer.chat.GuiMessageTag restoredIndicator() { throw new IllegalStateException("test: restored tag unreadable"); }
 				});
 				ChatPatchesAdapter.get().selfCheck();
 			}

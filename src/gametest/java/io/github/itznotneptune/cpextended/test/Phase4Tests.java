@@ -68,7 +68,7 @@ final class Phase4Tests {
 
 	<T> T onClient(java.util.function.Supplier<T> s) { return ctx.computeOnClient(c -> s.get()); }
 
-	Screen screen() { return onClient(() -> Minecraft.getInstance().screen); }
+	Screen screen() { return onClient(() -> Minecraft.getInstance().gui.screen()); }
 
 	void restart(String config) {
 		Phase2Tests.write(Phase2Tests.cfg(), config);
@@ -89,7 +89,7 @@ final class Phase4Tests {
 	/** First widget on the current screen whose label contains {@code text}. */
 	AbstractWidget widget(String text) {
 		return onClient(() -> {
-			Screen s = Minecraft.getInstance().screen;
+			Screen s = Minecraft.getInstance().gui.screen();
 			if (s == null) return null;
 			for (var ch : s.children()) if (ch instanceof AbstractWidget w && w.getMessage().getString().contains(text)) return w;
 			return null;
@@ -152,7 +152,7 @@ final class Phase4Tests {
 		try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
 			t.waitT(40);
 			restart(guiConfig());
-			ctx.runOnClient(c -> { c.options.hideGui = false; c.options.chatVisibility().set(ChatVisiblity.FULL); });
+			ctx.runOnClient(c -> { HudState.setHidden(c, false); c.options.chatVisibility().set(ChatVisiblity.FULL); });
 			screenOpenCheck();
 			windowAndTabCreation(sp);
 			v21(sp);
@@ -431,14 +431,14 @@ final class Phase4Tests {
 		m.put("3.disabled", AcceptanceTest.row("unread", unread("gmov"), "ok", three));
 		// (4) into an empty window while F1 is on and chat is closed (config GUI): hidden, kept; cleared once visible
 		ctx.runOnClient(c -> mgr().edit(new ConfigEdit.AddWindow("g-empty2", 0.05, 0.4, 0.3, 0.2)));
-		ctx.runOnClient(c -> c.options.hideGui = true);
+		ctx.runOnClient(c -> HudState.setHidden(c, true));
 		WindowScreen ws2 = onClient(() -> new WindowScreen(new ConfigScreen(null), "g-off"));
 		open(ws2);
 		onClient(() -> ws2.moveTab("gmov", "g-empty2"));
 		t.waitT(3);
 		int u4 = unread("gmov");
 		ctx.setScreen(() -> null);
-		ctx.runOnClient(c -> c.options.hideGui = false);
+		ctx.runOnClient(c -> HudState.setHidden(c, false));
 		t.waitT(3);
 		int u4after = unread("gmov");
 		boolean four = u4 == u3 && u4after == 0;
@@ -457,7 +457,7 @@ final class Phase4Tests {
 		boolean orphanDialog = screen() instanceof net.minecraft.client.gui.screens.ConfirmScreen cs && cs.getTitle().getString().contains("hidden messages");
 		press("No");
 		boolean tabKept = "g-b".equals(windowOf("gb1"));
-		String status = onClient(() -> ((WindowScreen) Minecraft.getInstance().screen).status().getString());
+		String status = onClient(() -> ((WindowScreen) Minecraft.getInstance().gui.screen()).status().getString());
 		// deleting the whole window: per-tab choice screen, then the same disclosure; "No" keeps everything
 		press("Delete window");
 		boolean choiceScreen = screen() instanceof io.github.itznotneptune.cpextended.gui.DeleteWindowScreen;
@@ -498,7 +498,7 @@ final class Phase4Tests {
 		press("Apply file");
 		press("Yes");
 		m.put("applyRefusedStillLocked", onClient(() -> mgr().state()) == ConfigManager.State.DIVERGENCE);
-		m.put("applyStatus", onClient(() -> ((ConfigScreen) Minecraft.getInstance().screen).status().getString()));
+		m.put("applyStatus", onClient(() -> ((ConfigScreen) Minecraft.getInstance().gui.screen()).status().getString()));
 		press("Overwrite file");
 		press("No");
 		m.put("overwriteNoKeepsLock", onClient(() -> mgr().state()) == ConfigManager.State.DIVERGENCE);
@@ -616,10 +616,10 @@ final class Phase4Tests {
 			t.waitT(40);
 			restart(dragConfig());
 			ctx.runOnClient(c -> {
-				c.options.hideGui = false;
+				HudState.setHidden(c, false);
 				c.options.chatVisibility().set(ChatVisiblity.FULL);
 				c.options.chatWidth().set(0.4);
-				c.gui.getChat().rescaleChat();
+				c.gui.hud.getChat().rescaleChat();
 			});
 			for (int i = 1; i <= 12; i++) t.sys(sp, "tab " + i + " message cpx#DA" + i + "-1");
 			for (int i = 0; i < 3; i++) t.sys(sp, "bee message cpx#DB-" + i);
@@ -702,7 +702,7 @@ final class Phase4Tests {
 		ChatScreenInput.Drop d3 = dragTab("d-a", "db2", 60, sc[1] - 8, null);
 		ChatOpenRenderer.Layout ch2 = p3.layout("d-chat");
 		double[] coveredStrip = onClient(() -> {
-			ChatScreen s = (ChatScreen) Minecraft.getInstance().screen;
+			ChatScreen s = (ChatScreen) Minecraft.getInstance().gui.screen();
 			for (int x = ch2.strip()[0] + 2; x < ch2.strip()[0] + ch2.strip()[2]; x += 2) {
 				if (HitTester.protectedRegion(s, x + 0.5, ch2.strip()[1] + 6.5) != null) return new double[]{x + 0.5, ch2.strip()[1] + 6.5};
 			}
@@ -713,7 +713,7 @@ final class Phase4Tests {
 				"ok", d3 == ChatScreenInput.Drop.CANCELLED_PROTECTED && (coveredStrip == null || d3b == ChatScreenInput.Drop.CANCELLED_PROTECTED) && "d-a".equals(windowOf("db2"))));
 		// uncovered part of the same strip accepts (V-41c)
 		double[] freeStrip = onClient(() -> {
-			ChatScreen s = (ChatScreen) Minecraft.getInstance().screen;
+			ChatScreen s = (ChatScreen) Minecraft.getInstance().gui.screen();
 			for (int x = ch2.strip()[0] + ch2.strip()[2] - 4; x > ch2.strip()[0]; x -= 2) {
 				var top = ChatOpenRenderer.topAt(x + 0.5, ch2.strip()[1] + 6.5);
 				if (top != null && top.windowId().equals("d-chat") && HitTester.protectedRegion(s, x + 0.5, ch2.strip()[1] + 6.5) == null) return new double[]{x + 0.5, ch2.strip()[1] + 6.5};
@@ -867,7 +867,7 @@ final class Phase4Tests {
 		try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
 			t.waitT(40);
 			restart(Phase3Tests.CONFIG);
-			ctx.runOnClient(c -> { c.options.hideGui = false; c.options.chatVisibility().set(ChatVisiblity.FULL); c.options.chatWidth().set(0.4); c.gui.getChat().rescaleChat(); });
+			ctx.runOnClient(c -> { HudState.setHidden(c, false); c.options.chatVisibility().set(ChatVisiblity.FULL); c.options.chatWidth().set(0.4); c.gui.hud.getChat().rescaleChat(); });
 			for (int i = 0; i < 8; i++) p3.magenta(sp, "scale window line " + i + " cpx#PC-" + i);
 			// the newest line of p3-c (bottom-left, under the input box) is hover-enabled over its whole text
 			sp.getServer().runOnServer(s -> s.getPlayerList().broadcastSystemMessage(Component.literal("HOVER UNDER INPUT cpx#PC-hover")
@@ -877,7 +877,7 @@ final class Phase4Tests {
 			int old = onClient(() -> Minecraft.getInstance().options.guiScale().get());
 			for (int gs = 1; gs <= 4; gs++) {
 				int g = gs;
-				ctx.runOnClient(c -> { c.options.guiScale().set(g); c.resizeDisplay(); WindowRenderer.resetCounters(); });
+				ctx.runOnClient(c -> { c.options.guiScale().set(g); c.resizeGui(); WindowRenderer.resetCounters(); });
 				t.waitT(4);
 				int actual = onClient(() -> (int) Minecraft.getInstance().getWindow().getGuiScale());
 				int[] hud = WindowRenderer.lastRect("p3-c");
@@ -891,7 +891,7 @@ final class Phase4Tests {
 				int[] r = c.rect();
 				boolean[][] prot = ctx.computeOnClient(cl -> {
 					boolean[][] p = new boolean[r[2]][r[3]];
-					ChatScreen s = (ChatScreen) cl.screen;
+					ChatScreen s = (ChatScreen) cl.gui.screen();
 					for (int x = 0; x < r[2]; x++) for (int y = 0; y < r[3]; y++) p[x][y] = HitTester.protectedRegion(s, r[0] + x + 0.5, r[1] + y + 0.5) != null;
 					return p;
 				});
@@ -905,7 +905,7 @@ final class Phase4Tests {
 					if (!prot[x][y] && pure) visibleElsewhere++;
 				}
 				List<String> coveredDetail = ctx.computeOnClient(cl -> coveredAt.stream().map(pt -> pt[0] + "," + pt[1] + ":"
-						+ HitTester.protectedRegion((ChatScreen) cl.screen, pt[0] + 0.5, pt[1] + 0.5)).toList());
+						+ HitTester.protectedRegion((ChatScreen) cl.gui.screen(), pt[0] + 0.5, pt[1] + 0.5)).toList());
 				// input matches visual layering: scroll at sample points
 				int mism = 0;
 				for (int gy2 = 0; gy2 < 4; gy2++) for (int gx = 0; gx < 6; gx++) {
@@ -915,13 +915,13 @@ final class Phase4Tests {
 					p3.scrollAt(px + 0.5, py + 0.5, 1);
 					if ((ChatScreenInput.consumedScrolls() > before) != expected) mism++;
 				}
-				ctx.runOnClient(cl -> { cl.gui.getChat().resetChatScroll(); ChatOpenRenderer.setScroll("p3-c", 0); });
+				ctx.runOnClient(cl -> { cl.gui.hud.getChat().resetChatScroll(); ChatOpenRenderer.setScroll("p3-c", 0); });
 				t.waitT(2);
 				// tooltip under the vanilla input box with a real hover-enabled message: suppressed
 				ChatOpenRenderer.Layout c2 = p3.layout("p3-c");
 				double[] hp = onClient(() -> {
 					var font = Minecraft.getInstance().font;
-					ChatScreen s = (ChatScreen) Minecraft.getInstance().screen;
+					ChatScreen s = (ChatScreen) Minecraft.getInstance().gui.screen();
 					for (ChatOpenRenderer.LineSlot l : c2.lines()) for (int x = l.x(); x < c2.rect()[0] + c2.rect()[2]; x++) {
 						Style st = ChatOpenRenderer.styleAt(font, l, x + 1.5);
 						if (st != null && st.getHoverEvent() != null && "input".equals(HitTester.protectedRegion(s, x + 1.5, l.y() + l.h() / 2.0)))
@@ -940,7 +940,7 @@ final class Phase4Tests {
 						"windowTextVisibleElsewhere", visibleElsewhere, "coveredDetail", coveredDetail, "inputMismatches", mism, "tooltipUnderInputFound", hp != null, "tooltipSuppressed", suppressed,
 						"hudAndChatOpenRectEqual", same, "ok", rowOk));
 			}
-			ctx.runOnClient(c -> { c.options.guiScale().set(old); c.resizeDisplay(); });
+			ctx.runOnClient(c -> { c.options.guiScale().set(old); c.resizeGui(); });
 		}
 		ctx.getInput().resizeWindow(854, 480);
 		t.waitT(20);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 package io.github.itznotneptune.cpextended.test.mixin;
 
-import net.minecraft.client.GuiMessage;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.network.chat.Component;
 import org.spongepowered.asm.mixin.Mixin;
@@ -19,7 +19,7 @@ public abstract class NestedAddMixin {
 		if (cpextendedTest$inside || !message.content().getString().contains("[NEST]")) return;
 		cpextendedTest$inside = true;
 		try {
-			((ChatComponent) (Object) this).addMessage(Component.literal("nested inner cpx#NEST-I"));
+			((ChatComponent) (Object) this).addClientSystemMessage(Component.literal("nested inner cpx#NEST-I"));
 		} finally {
 			cpextendedTest$inside = false;
 		}

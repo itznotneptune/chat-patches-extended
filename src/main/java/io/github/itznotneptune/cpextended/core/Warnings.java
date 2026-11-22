@@ -45,7 +45,7 @@ public final class Warnings {
 		if (mc == null) return;
 		Component title = Component.translatable("cpextended.warning.title");
 		Component body = Component.translatable("cpextended.warning." + toast.name().toLowerCase(java.util.Locale.ROOT), args);
-		mc.execute(() -> SystemToast.add(mc.getToastManager(), new SystemToast.SystemToastId(), title, body));
+		mc.execute(() -> SystemToast.add(mc.gui.toastManager(), new SystemToast.SystemToastId(), title, body));
 	}
 
 	public static synchronized Map<String, Integer> counts() { return Map.copyOf(COUNTS); }

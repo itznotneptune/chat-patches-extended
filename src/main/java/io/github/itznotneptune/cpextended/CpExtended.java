@@ -36,7 +36,7 @@ public final class CpExtended implements ClientModInitializer {
 		});
 		// Liveness pruning also runs on a tick check, never inside screen input handlers (architecture §4.7).
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
-			Capture.onTick(client.gui.getChat());
+			Capture.onTick(client.gui.hud.getChat());
 			UnreadTracker.tick();
 			ConfigManager.get().tick();
 			OrphanRestore.tick(client);

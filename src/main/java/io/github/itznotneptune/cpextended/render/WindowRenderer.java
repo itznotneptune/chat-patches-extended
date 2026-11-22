@@ -13,7 +13,7 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.FormattedCharSequence;
@@ -32,7 +32,7 @@ import java.util.Map;
 public final class WindowRenderer {
 	public static final Identifier ID = Identifier.fromNamespaceAndPath("cpextended", "windows");
 
-	// Verification counters shared by both paths (frame identity = the GuiGraphics instance, created once per frame).
+	// Verification counters shared by both paths (frame identity = the GuiGraphicsExtractor instance, created once per frame).
 	private static Object lastFrame;
 	private static final Map<String, Integer> drawsThisFrame = new HashMap<>();
 	private static long framesWithDraws, duplicateDraws, hudPathDraws;
@@ -46,14 +46,14 @@ public final class WindowRenderer {
 		HudElementRegistry.attachElementAfter(VanillaHudElements.CHAT, ID, WindowRenderer::render);
 	}
 
-	static void render(GuiGraphics g, DeltaTracker delta) {
+	static void render(GuiGraphicsExtractor g, DeltaTracker delta) {
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.level == null) return;
-		if (mc.screen instanceof ChatScreen) return; // P10: the chat-open path draws these frames
+		if (mc.gui.screen() instanceof ChatScreen) return; // P10: the chat-open path draws these frames
 		ExtendedConfig cfg = ConfigManager.get().config();
 		if (!cfg.enabled()) return;
 		Options o = mc.options;
-		if (o.hideGui) return; // F1 hides windows in gameplay (Q26); explicit, not relying on Fabric's own gating
+		if (mc.gui.hud.isHidden()) return; // F1 hides windows in gameplay (Q26); explicit, not relying on Fabric's own gating
 		if (o.chatVisibility().get() == ChatVisiblity.HIDDEN) return;
 		RenderSupport.Look look = RenderSupport.look(cfg.appearance());
 		for (ExtendedConfig.Window w : cfg.windows()) { // array order = stacking order, back to front (Q34)
@@ -64,7 +64,7 @@ public final class WindowRenderer {
 		}
 	}
 
-	private static void drawWindow(GuiGraphics g, Minecraft mc, RenderSupport.Look look, ExtendedConfig.Window w) {
+	private static void drawWindow(GuiGraphicsExtractor g, Minecraft mc, RenderSupport.Look look, ExtendedConfig.Window w) {
 		Font font = mc.font;
 		double scale = look.scale();
 		int lineHeight = look.lineHeight();
@@ -84,7 +84,7 @@ public final class WindowRenderer {
 		int maxLines = Math.max(0, innerH / lineHeight);
 		int y = innerH + RenderSupport.PADDING;
 		List<MessageRecord> entries = state == null ? List.of() : state.entries();
-		int guiTicks = mc.gui.getGuiTicks();
+		int guiTicks = mc.gui.hud.getGuiTicks();
 		int drawn = 0;
 		for (int i = entries.size() - 1; i >= 0 && drawn < maxLines; i--) {
 			MessageRecord rec = entries.get(i);
@@ -96,7 +96,7 @@ public final class WindowRenderer {
 				y -= lineHeight;
 				int pad = (lineHeight - 9) / 2;
 				g.fill(0, y - pad - 1, width, y + 9 + pad, RenderSupport.argb(look.bgOpacity() * alpha, 0));
-				g.drawString(font, lines.get(j), RenderSupport.PADDING, y + pad, RenderSupport.argb(look.textOpacity() * alpha, 0xFFFFFF), true);
+				g.text(font, lines.get(j), RenderSupport.PADDING, y + pad, RenderSupport.argb(look.textOpacity() * alpha, 0xFFFFFF), true);
 				drawn++;
 			}
 		}
@@ -104,7 +104,7 @@ public final class WindowRenderer {
 		g.pose().popMatrix();
 	}
 
-	static void countDraw(GuiGraphics g, String windowId) {
+	static void countDraw(GuiGraphicsExtractor g, String windowId) {
 		if (g != lastFrame) {
 			lastFrame = g;
 			drawsThisFrame.clear();

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 package io.github.itznotneptune.cpextended.core;
 
-import net.minecraft.client.GuiMessage;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.minecraft.client.gui.components.ChatComponent;
 
 import java.util.ArrayDeque;

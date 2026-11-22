@@ -176,7 +176,7 @@ final class Rc2Tests {
 	}
 
 	static AbstractWidget widgetNow(String text) {
-		Screen s = Minecraft.getInstance().screen;
+		Screen s = Minecraft.getInstance().gui.screen();
 		if (s == null) return null;
 		for (var ch : s.children()) if (ch instanceof AbstractWidget w && w.getMessage().getString().contains(text)) return w;
 		return null;
@@ -185,14 +185,14 @@ final class Rc2Tests {
 	/** Text shown by a confirmation or alert screen (title and message, as narrated). */
 	String dialogText() {
 		return onClient(() -> {
-			Screen s = Minecraft.getInstance().screen;
+			Screen s = Minecraft.getInstance().gui.screen();
 			return s == null ? null : s.getNarrationMessage().getString();
 		});
 	}
 
 	String statusText() {
 		return onClient(() -> {
-			Screen s = Minecraft.getInstance().screen;
+			Screen s = Minecraft.getInstance().gui.screen();
 			if (s instanceof ConfigScreen c) return c.status().getString();
 			if (s instanceof WindowScreen w) return w.status().getString();
 			if (s instanceof TabScreen ts) return ts.status().getString();
@@ -206,8 +206,8 @@ final class Rc2Tests {
 		return onClient(() -> {
 			Minecraft mc = Minecraft.getInstance();
 			List<String> out = new ArrayList<>();
-			if (mc.screen == null) return out;
-			for (var ch : mc.screen.children()) {
+			if (mc.gui.screen() == null) return out;
+			for (var ch : mc.gui.screen().children()) {
 				if (ch instanceof AbstractWidget w && !(w instanceof EditBox) && w.visible) {
 					int need = mc.font.width(w.getMessage());
 					if (need > w.getWidth() - 4) out.add(w.getMessage().getString() + " (" + need + " > " + (w.getWidth() - 4) + ")");
@@ -221,7 +221,7 @@ final class Rc2Tests {
 	List<String> overlaps() {
 		return onClient(() -> {
 			List<AbstractWidget> ws = new ArrayList<>();
-			Screen s = Minecraft.getInstance().screen;
+			Screen s = Minecraft.getInstance().gui.screen();
 			if (s == null) return List.of();
 			for (var ch : s.children()) if (ch instanceof AbstractWidget w && w.visible) ws.add(w);
 			List<String> out = new ArrayList<>();
@@ -237,13 +237,13 @@ final class Rc2Tests {
 	/** A screenshot without warning toasts (left over from simulated restarts) or a hover tooltip over the screen. */
 	void shot(String name) {
 		if (!name.contains("tooltip")) new Phase3Tests(t).cursor(1, 1); // away from every control
-		ctx.runOnClient(c -> c.getToastManager().clear());
+		ctx.runOnClient(c -> c.gui.toastManager().clear());
 		t.waitT(2);
 		ctx.takeScreenshot(name);
 	}
 
 	void setScale(int scale) {
-		ctx.runOnClient(c -> { c.options.guiScale().set(scale); c.resizeDisplay(); });
+		ctx.runOnClient(c -> { c.options.guiScale().set(scale); c.resizeGui(); });
 		t.waitT(3);
 	}
 
@@ -702,7 +702,7 @@ final class Rc2Tests {
 		Phase2Tests.writeJson(cfg(), newer);
 		remember("Newer-" + label, bytes(cfg()));
 		restart();
-		ctx.runOnClient(c -> { ChatPatches.config.chatMaxMessages = 60; c.gui.getChat().clearMessages(false); });
+		ctx.runOnClient(c -> { ChatPatches.config.chatMaxMessages = 60; c.gui.hud.getChat().clearMessages(false); });
 		t.waitT(3);
 	}
 
@@ -724,7 +724,7 @@ final class Rc2Tests {
 		p4.press("Restore from backup");
 		p4.press("Yes");
 		String disclosure = dialogText();
-		boolean disclosed = onClient(() -> Minecraft.getInstance().screen instanceof ConfirmScreen);
+		boolean disclosed = onClient(() -> Minecraft.getInstance().gui.screen() instanceof ConfirmScreen);
 		shot("rc2-restore-orphan-disclosure");
 		p4.press("No");
 		boolean noChangesNothing = sameAll(d0, q.dump()) && onClient(() -> mgr().state()) == ConfigManager.State.NO_SAVE;
@@ -881,7 +881,7 @@ final class Rc2Tests {
 		int oldScale = onClient(() -> Minecraft.getInstance().options.guiScale().get());
 		try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
 			t.waitT(40);
-			ctx.runOnClient(c -> { ChatPatches.config.chatMaxMessages = 60; c.gui.getChat().clearMessages(false); });
+			ctx.runOnClient(c -> { ChatPatches.config.chatMaxMessages = 60; c.gui.hud.getChat().clearMessages(false); });
 			setScale(2);
 			namesInDialogs(sp);
 			caseToggle(sp);
@@ -891,7 +891,7 @@ final class Rc2Tests {
 			emptyState();
 		} finally {
 			reset();
-			ctx.runOnClient(c -> { c.options.guiScale().set(oldScale); c.resizeDisplay(); });
+			ctx.runOnClient(c -> { c.options.guiScale().set(oldScale); c.resizeGui(); });
 			ctx.getInput().resizeWindow(854, 480);
 		}
 	}
@@ -948,7 +948,7 @@ final class Rc2Tests {
 		ctx.setScreen(() -> null);
 		// (5) pruning disclosure names the tab and keeps the count
 		t.clearHiddenFixtures();
-		ctx.runOnClient(c -> { ChatPatches.config.chatMaxMessages = 5; c.gui.getChat().clearMessages(false); });
+		ctx.runOnClient(c -> { ChatPatches.config.chatMaxMessages = 5; c.gui.hud.getChat().clearMessages(false); });
 		for (int i = 0; i < 5; i++) q.visible(sp, "visible prune " + i + " cpx#VP-" + i);
 		q.hidden("hidden prune cpx#TR-p", "gy1");
 		p4.open(() -> new WindowScreen(new ConfigScreen(null), "window-2"));
@@ -970,7 +970,7 @@ final class Rc2Tests {
 		WindowScreen ws = onClient(() -> new WindowScreen(new ConfigScreen(null), "window-1"));
 		p4.open(ws);
 		p4.press("Delete window");
-		String choiceTitle = onClient(() -> Minecraft.getInstance().screen == null ? null : Minecraft.getInstance().screen.getTitle().getString());
+		String choiceTitle = onClient(() -> Minecraft.getInstance().gui.screen() == null ? null : Minecraft.getInstance().gui.screen().getTitle().getString());
 		p4.press("Delete window");
 		String discWindow = dialogText();
 		shot("rc2-disclosure-window");
@@ -1007,7 +1007,7 @@ final class Rc2Tests {
 		restartGui();
 		Map<String, Object> m = new LinkedHashMap<>();
 		p4.open(() -> new TabScreen(new WindowScreen(new ConfigScreen(null), "window-2"), "gy1"));
-		m.put("title", onClient(() -> Minecraft.getInstance().screen.getTitle().getString()));
+		m.put("title", onClient(() -> Minecraft.getInstance().gui.screen().getTitle().getString()));
 		m.put("insensitiveTooltip", tooltipOf("aa"));
 		AbstractWidget caseButton = onClient(() -> widgetNow("aa"));
 		new Phase3Tests(t).cursor(caseButton.getX() + 12, caseButton.getY() + 10);
@@ -1031,7 +1031,7 @@ final class Rc2Tests {
 			ctx.getInput().pressKey(InputConstants.KEY_TAB);
 			t.waitT(1);
 			focused = onClient(() -> {
-				Screen s = Minecraft.getInstance().screen;
+				Screen s = Minecraft.getInstance().gui.screen();
 				return s != null && s.getFocused() instanceof AbstractWidget w && w.getMessage().getString().equals("Aa");
 			});
 		}
@@ -1070,16 +1070,16 @@ final class Rc2Tests {
 		Map<String, Object> m = new LinkedHashMap<>();
 		List<String> buttons = onClient(() -> {
 			List<String> out = new ArrayList<>();
-			for (var ch : Minecraft.getInstance().screen.children()) if (ch instanceof AbstractWidget w) out.add(w.getMessage().getString());
+			for (var ch : Minecraft.getInstance().gui.screen().children()) if (ch instanceof AbstractWidget w) out.add(w.getMessage().getString());
 			return out;
 		});
 		m.put("configScreenButtons", buttons);
 		m.put("window1Tooltip", tooltipOf("Window 1:"));
 		shot("rc2-window-list");
 		p4.press("Window 1:");
-		m.put("windowScreenTitle", onClient(() -> Minecraft.getInstance().screen.getTitle().getString()));
+		m.put("windowScreenTitle", onClient(() -> Minecraft.getInstance().gui.screen().getTitle().getString()));
 		m.put("moveTarget", onClient(() -> {
-			for (var ch : Minecraft.getInstance().screen.children()) if (ch instanceof AbstractWidget w && w.getMessage().getString().startsWith("-> ")) return w.getMessage().getString();
+			for (var ch : Minecraft.getInstance().gui.screen().children()) if (ch instanceof AbstractWidget w && w.getMessage().getString().startsWith("-> ")) return w.getMessage().getString();
 			return null;
 		}));
 		shot("rc2-window-screen");
@@ -1161,7 +1161,7 @@ final class Rc2Tests {
 				int bannerTop = 56, bannerBottom = 56 + layout[1] * 10;
 				List<String> intersect = onClient(() -> {
 					List<String> out = new ArrayList<>();
-					for (var ch : Minecraft.getInstance().screen.children())
+					for (var ch : Minecraft.getInstance().gui.screen().children())
 						if (ch instanceof AbstractWidget w && w.visible && w.getY() < bannerBottom && bannerTop < w.getY() + w.getHeight()) out.add(w.getMessage().getString());
 					return out;
 				});
@@ -1174,7 +1174,7 @@ final class Rc2Tests {
 				if (details) {
 					p4.press("Details");
 					alert = dialogText();
-					boolean isAlert = onClient(() -> Minecraft.getInstance().screen instanceof AlertScreen);
+					boolean isAlert = onClient(() -> Minecraft.getInstance().gui.screen() instanceof AlertScreen);
 					if (!isAlert) alert = null;
 					ctx.getInput().pressKey(InputConstants.KEY_ESCAPE);
 					t.waitT(2);
@@ -1216,7 +1216,7 @@ final class Rc2Tests {
 			});
 			List<String> intersect = onClient(() -> {
 				List<String> out = new ArrayList<>();
-				for (var ch : Minecraft.getInstance().screen.children())
+				for (var ch : Minecraft.getInstance().gui.screen().children())
 					if (ch instanceof AbstractWidget w && w.visible && w.getY() < help[2] && help[1] < w.getY() + w.getHeight()) out.add(w.getMessage().getString());
 				return out;
 			});

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 package io.github.itznotneptune.cpextended.compat;
 
-import net.minecraft.client.GuiMessageTag;
+import net.minecraft.client.multiplayer.chat.GuiMessageTag;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.network.chat.Component;
@@ -33,11 +33,11 @@ final class RealBackend implements ChatPatchesBackend {
 		return menu != null && menu.isFunctional() && menu.isMouseOver(x, y);
 	}
 	@Override public boolean overSettingsMenu(ChatScreen screen, double x, double y) { return ((ChatScreenAccess) screen).isMouseOverSettingsMenu(x, y); }
-	@Override public int mainChatLineAt(double x, double y) { return ((ChatComponentAccess) Minecraft.getInstance().gui.getChat()).getEoEIndex(x, y); }
+	@Override public int mainChatLineAt(double x, double y) { return ((ChatComponentAccess) Minecraft.getInstance().gui.hud.getChat()).getEoEIndex(x, y); }
 	@Override public boolean searchCaseSensitive() { return ChatPatches.config.caseSensitive; }
 	@Override public boolean searchRegex() { return ChatPatches.config.regex; }
 	@Override public boolean searchEmptyShowsFullChat() { return ChatPatches.config.searchEmptyShowsFullChat; }
-	@Override public java.util.List<net.minecraft.client.GuiMessage> searchResults(ChatScreen screen) { return ((ChatScreenAccess) screen).getSearchResults(); }
+	@Override public java.util.List<net.minecraft.client.multiplayer.chat.GuiMessage> searchResults(ChatScreen screen) { return ((ChatScreenAccess) screen).getSearchResults(); }
 
 	@Override
 	public Object searchError(java.lang.reflect.Field handle, ChatScreen screen) throws ReflectiveOperationException {

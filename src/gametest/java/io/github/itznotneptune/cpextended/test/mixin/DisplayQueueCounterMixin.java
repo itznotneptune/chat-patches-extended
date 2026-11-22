@@ -3,7 +3,7 @@ package io.github.itznotneptune.cpextended.test.mixin;
 
 import io.github.itznotneptune.cpextended.core.Capture;
 import io.github.itznotneptune.cpextended.test.TestCounters;
-import net.minecraft.client.GuiMessage;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.minecraft.client.gui.components.ChatComponent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;

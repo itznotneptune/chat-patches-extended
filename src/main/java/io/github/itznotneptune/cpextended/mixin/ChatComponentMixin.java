@@ -5,8 +5,9 @@ import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import io.github.itznotneptune.cpextended.core.Capture;
-import net.minecraft.client.GuiMessage;
-import net.minecraft.client.GuiMessageTag;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
+import net.minecraft.client.multiplayer.chat.GuiMessageSource;
+import net.minecraft.client.multiplayer.chat.GuiMessageTag;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MessageSignature;
@@ -19,27 +20,27 @@ import org.spongepowered.asm.mixin.injection.At;
  */
 @Mixin(ChatComponent.class)
 public abstract class ChatComponentMixin {
-	private static final String ADD_MESSAGE = "addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/GuiMessageTag;)V";
+	private static final String ADD_MESSAGE = "addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/multiplayer/chat/GuiMessageSource;Lnet/minecraft/client/multiplayer/chat/GuiMessageTag;)V";
 
 	/** M1: opens a capture frame around the whole call. */
 	@WrapMethod(method = ADD_MESSAGE)
-	private void cpextended$captureFrame(Component message, MessageSignature signature, GuiMessageTag tag, Operation<Void> original) {
+	private void cpextended$captureFrame(Component message, MessageSignature signature, GuiMessageSource source, GuiMessageTag tag, Operation<Void> original) {
 		boolean pushed = Capture.enter((ChatComponent) (Object) this, message, tag);
 		try {
-			original.call(message, signature, tag);
+			original.call(message, signature, source, tag);
 		} finally {
 			if (pushed) Capture.exit((ChatComponent) (Object) this);
 		}
 	}
 
 	/** M2: admission to the visible line list; only acts inside an M1 frame. */
-	@WrapWithCondition(method = ADD_MESSAGE, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/components/ChatComponent;addMessageToDisplayQueue(Lnet/minecraft/client/GuiMessage;)V"))
+	@WrapWithCondition(method = ADD_MESSAGE, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/components/ChatComponent;addMessageToDisplayQueue(Lnet/minecraft/client/multiplayer/chat/GuiMessage;)V"))
 	private boolean cpextended$admitToDisplay(ChatComponent self, GuiMessage message) {
 		return Capture.admitDisplay(message);
 	}
 
 	/** M3: admission to the message list; delivers to tabs once per frame. */
-	@WrapWithCondition(method = ADD_MESSAGE, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/components/ChatComponent;addMessageToQueue(Lnet/minecraft/client/GuiMessage;)V"))
+	@WrapWithCondition(method = ADD_MESSAGE, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/components/ChatComponent;addMessageToQueue(Lnet/minecraft/client/multiplayer/chat/GuiMessage;)V"))
 	private boolean cpextended$admitToMessages(ChatComponent self, GuiMessage message) {
 		return Capture.admitMessages(message);
 	}

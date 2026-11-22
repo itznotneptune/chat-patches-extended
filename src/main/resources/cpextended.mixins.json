@@ -3,12 +3,13 @@
   "minVersion": "0.8",
   "package": "io.github.itznotneptune.cpextended.mixin",
   "plugin": "io.github.itznotneptune.cpextended.mixin.CpExtendedMixinPlugin",
-  "compatibilityLevel": "JAVA_21",
+  "compatibilityLevel": "JAVA_25",
   "client": [
     "ChatComponentAccessor",
     "ChatComponentMixin",
     "ChatScreenAccessor",
     "CommandSuggestionsAccessor",
+    "GuiGraphicsExtractorAccessor",
     "SuggestionsListAccessor"
   ],
   "injectors": {

@@ -6,7 +6,7 @@ import io.github.itznotneptune.cpextended.config.ConfigManager;
 import io.github.itznotneptune.cpextended.config.ConfigStorage;
 import io.github.itznotneptune.cpextended.config.ExtendedConfig;
 import io.github.itznotneptune.cpextended.config.Labels;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.AlertScreen;
@@ -74,8 +74,8 @@ public final class ConfigScreen extends BaseScreen {
 		List<ExtendedConfig.Window> windows = m.config().windows();
 		if (bannerTruncated()) {
 			// M3: the full explanation when the banner can't show all of it
-			addRenderableWidget(Button.builder(Component.translatable("cpextended.gui.details"), b -> minecraft.setScreen(new AlertScreen(
-					() -> minecraft.setScreen(this), Component.translatable(m.state() == ConfigManager.State.NO_SAVE ? "cpextended.gui.state.no_save" : "cpextended.gui.state.divergence"),
+			addRenderableWidget(Button.builder(Component.translatable("cpextended.gui.details"), b -> minecraft.gui.setScreen(new AlertScreen(
+					() -> minecraft.gui.setScreen(this), Component.translatable(m.state() == ConfigManager.State.NO_SAVE ? "cpextended.gui.state.no_save" : "cpextended.gui.state.divergence"),
 					Component.literal(m.stateDetail())))).bounds(width / 2 - 50, 56 + BANNER_LINES * 10 + 2, 100, 20).build());
 		}
 		int per = rowsPerPage();
@@ -85,7 +85,7 @@ public final class ConfigScreen extends BaseScreen {
 			int ry = top + (i - page * per) * ROW;
 			String id = w.id();
 			Button open = addRenderableWidget(Button.builder(Component.literal(label(w)), b -> {
-				if (id != null) minecraft.setScreen(new WindowScreen(this, id));
+				if (id != null) minecraft.gui.setScreen(new WindowScreen(this, id));
 			}).bounds(width / 2 - 154, ry, 230, 20).build());
 			open.setTooltip(Tooltip.create(Component.literal(label(w) + (id != null ? "\nInternal id: " + id : ""))));
 			open.active = id != null && !w.suspended();
@@ -169,7 +169,7 @@ public final class ConfigScreen extends BaseScreen {
 		String id = m.unusedId("window");
 		ConfigManager.EditOutcome o = m.edit(new ConfigEdit.AddWindow(id, 0.05, 0.10, 0.30, 0.25));
 		report(o);
-		if (o.applied()) minecraft.setScreen(new WindowScreen(this, id));
+		if (o.applied()) minecraft.gui.setScreen(new WindowScreen(this, id));
 		else rebuildWidgets();
 	}
 
@@ -196,8 +196,8 @@ public final class ConfigScreen extends BaseScreen {
 	}
 
 	@Override
-	public void render(GuiGraphics g, int mx, int my, float delta) {
-		super.render(g, mx, my, delta);
+	public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float delta) {
+		super.extractRenderState(g, mx, my, delta);
 		ConfigManager m = ConfigManager.get();
 		if (m.state() != ConfigManager.State.NORMAL) {
 			// Persistent banner (P14): what's wrong, and which file and backup are involved. Wrapped below the recovery
@@ -210,14 +210,14 @@ public final class ConfigScreen extends BaseScreen {
 					String text = font.plainSubstrByWidth(plain(line), bannerWidth() - font.width("..."));
 					line = Component.literal(text + "...").getVisualOrderText();
 				}
-				g.drawCenteredString(font, line, width / 2, 56 + i * 10, 0xFFFFCC66);
+				g.centeredText(font, line, width / 2, 56 + i * 10, 0xFFFFCC66);
 			}
 		}
 		if (m.config().windows().isEmpty()) {
 			// M4: what windows and tabs are, and the next action.
 			List<FormattedCharSequence> help = font.split(Component.translatable("cpextended.gui.empty"), Math.min(width - 40, 300));
 			int y0 = listTop() + 6;
-			for (int i = 0; i < help.size(); i++) g.drawCenteredString(font, help.get(i), width / 2, y0 + i * 10, 0xFFCCCCCC);
+			for (int i = 0; i < help.size(); i++) g.centeredText(font, help.get(i), width / 2, y0 + i * 10, 0xFFCCCCCC);
 		}
 	}
 

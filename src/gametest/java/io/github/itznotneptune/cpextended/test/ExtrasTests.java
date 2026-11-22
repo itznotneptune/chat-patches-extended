@@ -26,7 +26,7 @@ final class ExtrasTests {
 
 	<T> T onClient(java.util.function.Supplier<T> s) { return ctx.computeOnClient(c -> s.get()); }
 
-	Screen screen() { return onClient(() -> Minecraft.getInstance().screen); }
+	Screen screen() { return onClient(() -> Minecraft.getInstance().gui.screen()); }
 
 	void restart(String config) {
 		Phase2Tests.write(Phase2Tests.cfg(), config);

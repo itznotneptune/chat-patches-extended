@@ -16,7 +16,7 @@ import io.github.itznotneptune.cpextended.ui.ChatScreenInput;
 import io.github.itznotneptune.cpextended.ui.HitTester;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
-import net.minecraft.client.GuiMessageTag;
+import net.minecraft.client.multiplayer.chat.GuiMessageTag;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
@@ -112,7 +112,7 @@ final class Phase3Tests {
 	/** {value, cursor, focused} of the vanilla chat input. */
 	List<Object> inputState() {
 		return ctx.computeOnClient(c -> {
-			if (!(c.screen instanceof ChatScreen s)) return List.of("no screen");
+			if (!(c.gui.screen() instanceof ChatScreen s)) return List.of("no screen");
 			EditBox search = ChatPatchesAdapter.get().searchFieldWidget(s);
 			for (GuiEventListener ch : s.children()) {
 				if (ch instanceof EditBox b && b != search) return List.of(b.getValue(), b.getCursorPosition(), b.isFocused() && s.getFocused() == b);
@@ -124,7 +124,7 @@ final class Phase3Tests {
 	/** A point of the window's body where it is the topmost window and no protected region lies, scanning from the right. */
 	double[] freePoint(String windowId) {
 		return onClient(() -> {
-			ChatScreen s = (ChatScreen) Minecraft.getInstance().screen;
+			ChatScreen s = (ChatScreen) Minecraft.getInstance().gui.screen();
 			ChatOpenRenderer.Layout l = null;
 			for (ChatOpenRenderer.Layout c : ChatOpenRenderer.lastLayouts()) if (c.windowId().equals(windowId)) l = c;
 			if (l == null) return null;
@@ -155,10 +155,10 @@ final class Phase3Tests {
 		Phase2Tests.write(Phase2Tests.cfg(), CONFIG);
 		ctx.runOnClient(c -> mgr().devSimulateRestart());
 		ctx.runOnClient(c -> {
-			c.options.hideGui = false;
+			HudState.setHidden(c, false);
 			c.options.chatVisibility().set(ChatVisiblity.FULL);
 			c.options.chatWidth().set(0.4); // vanilla setting: the open main chat's line area then ends well left of p3-a
-			c.gui.getChat().rescaleChat();
+			c.gui.hud.getChat().rescaleChat();
 		});
 		// p3-c's own lines first (magenta), then enough white filler that the open main chat no longer shows them.
 		for (int i = 0; i < 8; i++) magenta(sp, "window line " + i + " cpx#PC-" + i);
@@ -208,7 +208,7 @@ final class Phase3Tests {
 		ctx.runOnClient(c -> WindowRenderer.resetCounters());
 		t.waitT(6);
 		m.put("gameplay", WindowRenderer.framesWithDraws());
-		ctx.runOnClient(c -> { c.options.hideGui = true; WindowRenderer.resetCounters(); });
+		ctx.runOnClient(c -> { HudState.setHidden(c, true); WindowRenderer.resetCounters(); });
 		t.waitT(6);
 		m.put("gameplayF1", WindowRenderer.framesWithDraws());
 		openChat("");
@@ -227,7 +227,7 @@ final class Phase3Tests {
 		}
 		m.put("chatOpenF1SelectTab", selectWorks);
 		closeChat();
-		ctx.runOnClient(c -> { c.options.hideGui = false; c.options.chatVisibility().set(ChatVisiblity.HIDDEN); WindowRenderer.resetCounters(); });
+		ctx.runOnClient(c -> { HudState.setHidden(c, false); c.options.chatVisibility().set(ChatVisiblity.HIDDEN); WindowRenderer.resetCounters(); });
 		t.waitT(6);
 		m.put("gameplayHidden", WindowRenderer.framesWithDraws());
 		openChat("");
@@ -246,16 +246,16 @@ final class Phase3Tests {
 		TestCounters.trackedWindow = "p3-a";
 		TestCounters.expectedVisible = () -> {
 			Minecraft c = Minecraft.getInstance();
-			return c.level != null && c.options.chatVisibility().get() != ChatVisiblity.HIDDEN && (c.screen instanceof ChatScreen || !c.options.hideGui);
+			return c.level != null && c.options.chatVisibility().get() != ChatVisiblity.HIDDEN && (c.gui.screen() instanceof ChatScreen || !c.gui.hud.isHidden());
 		};
 		t.waitT(1);
 		TestCounters.ANOMALY_SAMPLES.clear();
 		int a0 = TestCounters.ANOMALIES.get(), f0 = TestCounters.FRAMES.get();
 		long d0 = WindowRenderer.duplicateDraws();
 		for (int i = 0; i < 40; i++) { ctx.setScreen(() -> new ChatScreen("", false)); t.waitT(1 + i % 2); ctx.setScreen(() -> null); t.waitT(1 + i % 3); }
-		ctx.runOnClient(c -> c.options.hideGui = true);
+		ctx.runOnClient(c -> HudState.setHidden(c, true));
 		for (int i = 0; i < 20; i++) { ctx.setScreen(() -> new ChatScreen("", false)); t.waitT(2); ctx.setScreen(() -> null); t.waitT(2); }
-		ctx.runOnClient(c -> { c.options.hideGui = false; c.options.chatVisibility().set(ChatVisiblity.HIDDEN); });
+		ctx.runOnClient(c -> { HudState.setHidden(c, false); c.options.chatVisibility().set(ChatVisiblity.HIDDEN); });
 		for (int i = 0; i < 10; i++) { ctx.setScreen(() -> new ChatScreen("", false)); t.waitT(2); ctx.setScreen(() -> null); t.waitT(2); }
 		ctx.runOnClient(c -> c.options.chatVisibility().set(ChatVisiblity.FULL));
 		// keyboard path: the chat key opens the screen
@@ -290,11 +290,11 @@ final class Phase3Tests {
 			int[] r = c.rect();
 			boolean[][] prot = ctx.computeOnClient(cl -> {
 				boolean[][] p = new boolean[r[2]][r[3]];
-				ChatScreen s = (ChatScreen) cl.screen;
+				ChatScreen s = (ChatScreen) cl.gui.screen();
 				for (int x = 0; x < r[2]; x++) for (int y = 0; y < r[3]; y++) p[x][y] = HitTester.protectedRegion(s, r[0] + x + 0.5, r[1] + y + 0.5) != null;
 				return p;
 			});
-			boolean menuOpen = onClient(() -> ChatPatchesAdapter.get().isContextMenuOpen((ChatScreen) Minecraft.getInstance().screen));
+			boolean menuOpen = onClient(() -> ChatPatchesAdapter.get().isContextMenuOpen((ChatScreen) Minecraft.getInstance().gui.screen()));
 			int coveredPure = 0, uncoveredPure = 0, protectedPixels = 0;
 			List<int[]> coveredAt = new ArrayList<>();
 			for (int x = 0; x < r[2]; x++) {
@@ -303,7 +303,7 @@ final class Phase3Tests {
 					if (prot[x][y]) { protectedPixels++; if (pure) { coveredPure++; if (coveredAt.size() < 12) coveredAt.add(new int[]{r[0] + x, r[1] + y}); } } else if (pure) uncoveredPure++;
 				}
 			}
-			List<String> coveredRegions = ctx.computeOnClient(cl -> coveredAt.stream().map(p -> p[0] + "," + p[1] + ":" + HitTester.protectedRegion((ChatScreen) cl.screen, p[0] + 0.5, p[1] + 0.5)).toList());
+			List<String> coveredRegions = ctx.computeOnClient(cl -> coveredAt.stream().map(p -> p[0] + "," + p[1] + ":" + HitTester.protectedRegion((ChatScreen) cl.gui.screen(), p[0] + 0.5, p[1] + 0.5)).toList());
 			// V-53 is about what protected elements draw. Chat Patches' search field is clickable two rows below the
 			// background it paints (and vanilla's input box likewise below its fill): window text there is visible but
 			// input goes to the field (conservative, Q18). Count those separately.
@@ -311,7 +311,7 @@ final class Phase3Tests {
 			// what it draws is the union of its button widgets (minus the search button).
 			List<int[]> menuButtons = ctx.computeOnClient(cl -> {
 				List<int[]> out = new ArrayList<>();
-				ChatScreen s = (ChatScreen) cl.screen;
+				ChatScreen s = (ChatScreen) cl.gui.screen();
 				for (var ch : s.children()) {
 					if (ch instanceof net.minecraft.client.gui.components.Button b && b.visible && !(b.getX() == 2 && b.getY() == s.height - 35 && b.getWidth() == 16)
 							&& ChatPatchesAdapter.get().isOverChatPatchesUi(s, b.getX() + b.getWidth() / 2.0, b.getY() + b.getHeight() / 2.0))
@@ -349,7 +349,7 @@ final class Phase3Tests {
 					if (consumed != expected) { mismatches++; if (bad.size() < 8) bad.add(px + "," + py + " expected=" + expected); }
 				}
 			}
-			ctx.runOnClient(cl -> cl.gui.getChat().resetChatScroll());
+			ctx.runOnClient(cl -> cl.gui.hud.getChat().resetChatScroll());
 			ok54 &= mismatches == 0;
 			scenes.add(row("scene", scene, "protectedPixelsInWindow", protectedPixels, "windowTextOverDrawnProtectedUi", coveredDrawn,
 					"windowTextInClickOnlyBand", band, "drawnCoveredAt", drawnCovered, "bandSamples", coveredRegions, "menuButtons", menuButtons.size(),
@@ -362,7 +362,7 @@ final class Phase3Tests {
 	}
 
 	String regionAt(int gx, int gy) {
-		return ctx.computeOnClient(cl -> HitTester.protectedRegion((ChatScreen) cl.screen, gx + 0.5, gy + 0.5));
+		return ctx.computeOnClient(cl -> HitTester.protectedRegion((ChatScreen) cl.gui.screen(), gx + 0.5, gy + 0.5));
 	}
 
 	static boolean pureMagenta(BufferedImage img, double scale, int gx, int gy) {
@@ -383,7 +383,7 @@ final class Phase3Tests {
 		// newest line of tab pa1 is the hover line; find HOVERWORD's x on it
 		double[] hover = onClient(() -> {
 			var font = Minecraft.getInstance().font;
-			ChatScreen scr = (ChatScreen) Minecraft.getInstance().screen;
+			ChatScreen scr = (ChatScreen) Minecraft.getInstance().gui.screen();
 			for (ChatOpenRenderer.LineSlot l : a.lines()) {
 				for (int x = l.x(); x < a.rect()[0] + a.rect()[2]; x++) {
 					Style st = ChatOpenRenderer.styleAt(font, l, x + 1.5);
@@ -421,7 +421,7 @@ final class Phase3Tests {
 			ChatOpenRenderer.Layout l = layout("p3-a");
 			double[] p = onClient(() -> {
 				var font = Minecraft.getInstance().font;
-				ChatScreen s = (ChatScreen) Minecraft.getInstance().screen;
+				ChatScreen s = (ChatScreen) Minecraft.getInstance().gui.screen();
 				for (ChatOpenRenderer.LineSlot line : l.lines()) {
 					for (int x = line.x(); x < l.rect()[0] + l.rect()[2]; x++) {
 						Style st = ChatOpenRenderer.styleAt(font, line, x + 0.5);
@@ -485,7 +485,7 @@ final class Phase3Tests {
 		int v0 = TestCounters.VANILLA_CLICKS.get();
 		click(fp[0], fp[1], 1);
 		m.put("rightClickVanillaCalls", TestCounters.VANILLA_CLICKS.get() - v0);
-		m.put("noContextMenu", !onClient(() -> ChatPatchesAdapter.get().isContextMenuOpen((ChatScreen) Minecraft.getInstance().screen)));
+		m.put("noContextMenu", !onClient(() -> ChatPatchesAdapter.get().isContextMenuOpen((ChatScreen) Minecraft.getInstance().gui.screen())));
 		// middle button passes through
 		int v1 = TestCounters.VANILLA_CLICKS.get();
 		click(fp[0], fp[1], 2);
@@ -516,7 +516,7 @@ final class Phase3Tests {
 				for (int x = l.x(); x < a3.rect()[0] + a3.rect()[2]; x++) {
 					Style st = ChatOpenRenderer.styleAt(font, l, x + 1.5);
 					if (st != null && st.getClickEvent() != null
-							&& HitTester.protectedRegion((ChatScreen) Minecraft.getInstance().screen, x + 1.5, l.y() + l.h() / 2.0) == null)
+							&& HitTester.protectedRegion((ChatScreen) Minecraft.getInstance().gui.screen(), x + 1.5, l.y() + l.h() / 2.0) == null)
 						return new double[]{x + 1.5, l.y() + l.h() / 2.0};
 				}
 			}
@@ -660,14 +660,14 @@ final class Phase3Tests {
 		drag(a.strip()[0] + a.strip()[2] - 30, a.strip()[1] + 6, a.strip()[0] + a.strip()[2] - 40, a.strip()[1] + 10, 0);
 		m.put("consumedVanillaClicks", TestCounters.VANILLA_CLICKS.get() - c0);
 		m.put("consumedVanillaScrolls", TestCounters.VANILLA_SCROLLS.get() - s0);
-		m.put("noContextMenu", !onClient(() -> ChatPatchesAdapter.get().isContextMenuOpen((ChatScreen) Minecraft.getInstance().screen)));
+		m.put("noContextMenu", !onClient(() -> ChatPatchesAdapter.get().isContextMenuOpen((ChatScreen) Minecraft.getInstance().gui.screen())));
 		int[] sc = screen();
 		int c1 = TestCounters.VANILLA_CLICKS.get(), s1 = TestCounters.VANILLA_SCROLLS.get();
 		click(sc[0] / 2.0, 6, 0);           // empty area: passes
 		scrollAt(30, sc[1] - 50, 1);         // main chat: passes
 		m.put("passedVanillaClicks", TestCounters.VANILLA_CLICKS.get() - c1);
 		m.put("passedVanillaScrolls", TestCounters.VANILLA_SCROLLS.get() - s1);
-		ctx.runOnClient(c -> c.gui.getChat().resetChatScroll());
+		ctx.runOnClient(c -> c.gui.hud.getChat().resetChatScroll());
 		boolean ok57 = Integer.valueOf(0).equals(m.get("consumedVanillaClicks")) && Integer.valueOf(0).equals(m.get("consumedVanillaScrolls"))
 				&& Boolean.TRUE.equals(m.get("noContextMenu")) && Integer.valueOf(1).equals(m.get("passedVanillaClicks")) && Integer.valueOf(1).equals(m.get("passedVanillaScrolls"));
 		ev.result("V-57", ok57, "observed", m);
@@ -697,7 +697,7 @@ final class Phase3Tests {
 		openChat("");
 		click(30, sc[1] - 46, 1);
 		t.waitT(3);
-		boolean menu = onClient(() -> ChatPatchesAdapter.get().isContextMenuOpen((ChatScreen) Minecraft.getInstance().screen));
+		boolean menu = onClient(() -> ChatPatchesAdapter.get().isContextMenuOpen((ChatScreen) Minecraft.getInstance().gui.screen()));
 		ChatOpenRenderer.Layout a = layout("p3-a");
 		String sel0 = onClient(() -> mgr().config().window("p3-a").selectedTab());
 		long cc = ChatScreenInput.consumedClicks();
@@ -727,15 +727,15 @@ final class Phase3Tests {
 		long c0 = ChatScreenInput.consumedClicks();
 		click(10, sc[1] - 27, 0); // search button (p3-c lies under it)
 		Boolean shown1 = onClient(() -> ChatPatchesAdapter.get().isSearchBarShown());
-		int[] field = onClient(() -> ChatPatchesAdapter.get().searchFieldRect((ChatScreen) Minecraft.getInstance().screen));
+		int[] field = onClient(() -> ChatPatchesAdapter.get().searchFieldRect((ChatScreen) Minecraft.getInstance().gui.screen()));
 		if (field != null) click(field[0] + 10, field[1] + 5, 0);
 		boolean fieldFocused = onClient(() -> {
-			ChatScreen s = (ChatScreen) Minecraft.getInstance().screen;
+			ChatScreen s = (ChatScreen) Minecraft.getInstance().gui.screen();
 			EditBox f2 = ChatPatchesAdapter.get().searchFieldWidget(s);
 			return f2 != null && s.getFocused() == f2;
 		});
 		click(10, sc[1] - 27, 1); // settings panel
-		boolean settings = onClient(() -> ((obro1961.chatpatches.accessor.ChatScreenAccess) Minecraft.getInstance().screen).isMouseOverSettingsMenu(10, Minecraft.getInstance().screen.height - 103));
+		boolean settings = onClient(() -> ((obro1961.chatpatches.accessor.ChatScreenAccess) Minecraft.getInstance().gui.screen()).isMouseOverSettingsMenu(10, Minecraft.getInstance().gui.screen().height - 103));
 		boolean noneConsumed = ChatScreenInput.consumedClicks() == c0;
 		click(10, sc[1] - 27, 1); // close the settings panel again
 		b.put("searchToggled", !java.util.Objects.equals(shown0, shown1));
@@ -757,7 +757,7 @@ final class Phase3Tests {
 		long ours = ChatScreenInput.consumedScrolls();
 		scrollAt(30, sc[1] - 46, 1);
 		m.put("mainChatScrolled", TestCounters.VANILLA_SCROLLS.get() - vs == 1 && ChatScreenInput.consumedScrolls() == ours);
-		ctx.runOnClient(c -> c.gui.getChat().resetChatScroll());
+		ctx.runOnClient(c -> c.gui.hud.getChat().resetChatScroll());
 		// input box over p3-c
 		int vc = TestCounters.VANILLA_CLICKS.get();
 		click(40, sc[1] - 8, 0);
@@ -766,7 +766,7 @@ final class Phase3Tests {
 		ctx.getInput().typeChars("/");
 		t.waitT(8);
 		int[] rect = onClient(() -> {
-			var cs = ((io.github.itznotneptune.cpextended.mixin.ChatScreenAccessor) Minecraft.getInstance().screen).cpextended$commandSuggestions();
+			var cs = ((io.github.itznotneptune.cpextended.mixin.ChatScreenAccessor) Minecraft.getInstance().gui.screen()).cpextended$commandSuggestions();
 			var list = cs == null ? null : ((io.github.itznotneptune.cpextended.mixin.CommandSuggestionsAccessor) cs).cpextended$suggestions();
 			if (list == null) return null;
 			var r = ((io.github.itznotneptune.cpextended.mixin.SuggestionsListAccessor) list).cpextended$rect();
@@ -781,7 +781,7 @@ final class Phase3Tests {
 		openChat("");
 		// no suggestions open now: the same point belongs to the window if nothing else covers it
 		if (rect != null) {
-			String reg = onClient(() -> HitTester.protectedRegion((ChatScreen) Minecraft.getInstance().screen, rect[0] + 5, rect[1] + 5));
+			String reg = onClient(() -> HitTester.protectedRegion((ChatScreen) Minecraft.getInstance().gui.screen(), rect[0] + 5, rect[1] + 5));
 			var top = onClient(() -> ChatOpenRenderer.topAt(rect[0] + 5, rect[1] + 5));
 			m.put("closedSuggestionsDontIntercept", reg == null || !reg.equals("suggestions"));
 			m.put("pointOwnerWhenClosed", reg != null ? reg : top == null ? "none" : top.windowId());
@@ -800,7 +800,7 @@ final class Phase3Tests {
 		int oldScale = onClient(() -> Minecraft.getInstance().options.guiScale().get());
 		for (int gs = 1; gs <= 4; gs++) {
 			int g = gs;
-			ctx.runOnClient(c -> { c.options.guiScale().set(g); c.resizeDisplay(); WindowRenderer.resetCounters(); });
+			ctx.runOnClient(c -> { c.options.guiScale().set(g); c.resizeGui(); WindowRenderer.resetCounters(); });
 			t.waitT(4);
 			int[] sc = screen();
 			int[] hudRect = WindowRenderer.lastRect("p3-a");
@@ -813,7 +813,7 @@ final class Phase3Tests {
 			ok &= inside && dup == 0;
 			rows.add(row("guiScale", gs, "screen", Arrays.toString(sc), "hudRect", Arrays.toString(hudRect), "chatOpenRect", Arrays.toString(openRect), "duplicateDraws", dup, "ok", inside && dup == 0));
 		}
-		ctx.runOnClient(c -> { c.options.guiScale().set(oldScale); c.resizeDisplay(); });
+		ctx.runOnClient(c -> { c.options.guiScale().set(oldScale); c.resizeGui(); });
 		// chat scale / opacity / spacing come from the vanilla options when the appearance doesn't set them
 		JsonObject j = Phase2Tests.json(Phase2Tests.cfg());
 		boolean fileUnchanged = Arrays.equals(before, Phase2Tests.bytes(Phase2Tests.cfg()));
@@ -826,7 +826,7 @@ final class Phase3Tests {
 		ctx.runOnClient(c -> mgr().edit(new ConfigEdit.SelectTab("p3-a", "pa2")));
 		t.waitT(2);
 		// a fresh line in tab pa2, then wait past vanilla's 200-tick fade
-		ctx.runOnClient(c -> c.gui.getChat().addMessage(Component.literal("fresh line cpx#PB-fade")));
+		ctx.runOnClient(c -> c.gui.hud.getChat().addClientSystemMessage(Component.literal("fresh line cpx#PB-fade")));
 		t.waitT(4);
 		int fresh = WindowRenderer.hudLinesDrawn("p3-a");
 		t.waitT(215);
@@ -905,7 +905,7 @@ final class Phase3Tests {
 		try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
 			t.waitT(40);
 			Phase2Tests.write(Phase2Tests.cfg(), CONFIG);
-			ctx.runOnClient(c -> { mgr().devSimulateRestart(); c.options.hideGui = false; c.options.chatVisibility().set(ChatVisiblity.FULL); });
+			ctx.runOnClient(c -> { mgr().devSimulateRestart(); HudState.setHidden(c, false); c.options.chatVisibility().set(ChatVisiblity.FULL); });
 			t.waitT(4);
 			Map<String, Object> r33 = new LinkedHashMap<>();
 			t.sys(sp, "selected visible cpx#PA-u1");      // pa1 selected, p3-a visible -> read; poff (disabled window) -> unread
@@ -914,16 +914,18 @@ final class Phase3Tests {
 			r33.put("selectedVisible", count("pa1"));
 			r33.put("unselected", count("pa2"));
 			r33.put("disabledWindow", count("poff"));
-			ctx.runOnClient(c -> c.options.hideGui = true);
+			ctx.runOnClient(c -> HudState.setHidden(c, true));
 			t.sys(sp, "under F1 cpx#PA-u2");
 			t.waitT(4);
 			r33.put("selectedUnderF1", count("pa1"));
-			ctx.runOnClient(c -> c.options.hideGui = false);
+			ctx.runOnClient(c -> HudState.setHidden(c, false));
 			t.waitT(2);
 			int afterF1Off = count("pa1");
 			ctx.runOnClient(c -> c.options.chatVisibility().set(ChatVisiblity.HIDDEN));
 			t.waitT(2);
-			t.sys(sp, "under hidden cpx#PA-u3");
+			// 26.2: the client now syncs Chat Visibility to the server, which then drops system messages for a hidden-chat
+			// player (ServerPlayer.acceptsSystemMessages). Add the line client-side so it still reaches the chat.
+			t.local("under hidden cpx#PA-u3");
 			t.waitT(4);
 			r33.put("selectedUnderChatHidden", count("pa1"));
 			ctx.runOnClient(c -> c.options.chatVisibility().set(ChatVisiblity.FULL));
@@ -944,7 +946,7 @@ final class Phase3Tests {
 			t.waitT(2);
 
 			// V-33e: F1 with chat closed hides; opening chat under F1 shows (and clears); closing hides again
-			ctx.runOnClient(c -> c.options.hideGui = true);
+			ctx.runOnClient(c -> HudState.setHidden(c, true));
 			t.sys(sp, "f1 closed cpx#PA-e1");
 			t.waitT(4);
 			int flaggedClosed = count("pa1");
@@ -958,7 +960,7 @@ final class Phase3Tests {
 			t.sys(sp, "f1 closed again cpx#PA-e2");
 			t.waitT(4);
 			int flaggedAgain = count("pa1");
-			ctx.runOnClient(c -> c.options.hideGui = false);
+			ctx.runOnClient(c -> HudState.setHidden(c, false));
 			t.waitT(2);
 			ev.result("V-33e", flaggedClosed == 1 && clearedOpen == 0 && drawnAndInteractive && flaggedAgain == 1,
 					"flaggedWithChatClosedUnderF1", flaggedClosed, "clearedOnOpeningChatUnderF1", clearedOpen, "drawnAndInteractive", drawnAndInteractive,
@@ -988,11 +990,11 @@ final class Phase3Tests {
 			t.waitT(4);
 			int beforeDel = count("pa2");
 			ctx.runOnClient(c -> {
-				for (var g : AcceptanceTest.allMessagesReflective(c.gui.getChat())) if (g.content().getString().contains("cpx#PB-del")) { obro1961.chatpatches.util.ChatUtil.deleteMessage(g, false); break; }
+				for (var g : AcceptanceTest.allMessagesReflective(c.gui.hud.getChat())) if (g.content().getString().contains("cpx#PB-del")) { obro1961.chatpatches.util.ChatUtil.deleteMessage(g, false); break; }
 			});
 			t.waitT(3);
 			int afterDel = count("pa2");
-			ctx.runOnClient(c -> c.gui.getChat().clearMessages(false));
+			ctx.runOnClient(c -> c.gui.hud.getChat().clearMessages(false));
 			t.waitT(3);
 			int afterClear = count("pa2");
 			boolean neverAboveRetained = onClient(() -> {
@@ -1051,7 +1053,7 @@ final class Phase3Tests {
 		@Override public boolean searchCaseSensitive() { return real.searchCaseSensitive(); }
 		@Override public boolean searchRegex() { return real.searchRegex(); }
 		@Override public boolean searchEmptyShowsFullChat() { return real.searchEmptyShowsFullChat(); }
-		@Override public java.util.List<net.minecraft.client.GuiMessage> searchResults(ChatScreen s) { return real.searchResults(s); }
+		@Override public java.util.List<net.minecraft.client.multiplayer.chat.GuiMessage> searchResults(ChatScreen s) { return real.searchResults(s); }
 		@Override public Object searchError(java.lang.reflect.Field h, ChatScreen s) throws ReflectiveOperationException { return real.searchError(h, s); }
 	}
 }

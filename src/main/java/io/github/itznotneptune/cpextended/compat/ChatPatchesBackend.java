@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 package io.github.itznotneptune.cpextended.compat;
 
-import net.minecraft.client.GuiMessageTag;
+import net.minecraft.client.multiplayer.chat.GuiMessageTag;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.network.chat.Component;
 
@@ -34,7 +34,7 @@ public interface ChatPatchesBackend {
 	boolean searchRegex();
 	boolean searchEmptyShowsFullChat();
 	/** {@code ChatScreenAccess.getSearchResults()}: Chat Patches' current main-chat search results. */
-	java.util.List<net.minecraft.client.GuiMessage> searchResults(ChatScreen screen);
+	java.util.List<net.minecraft.client.multiplayer.chat.GuiMessage> searchResults(ChatScreen screen);
 	/** Reads the resolved {@code searchError} handle (P12 amendment); a seam for fault injection. */
 	Object searchError(java.lang.reflect.Field handle, ChatScreen screen) throws ReflectiveOperationException;
 }

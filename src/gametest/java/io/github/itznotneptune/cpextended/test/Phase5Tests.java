@@ -18,7 +18,7 @@ import io.github.itznotneptune.cpextended.search.TabSearch;
 import io.github.itznotneptune.cpextended.ui.HitTester;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
-import net.minecraft.client.GuiMessage;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.ChatScreen;
@@ -62,7 +62,7 @@ final class Phase5Tests {
 	ConfigManager mgr() { return ConfigManager.get(); }
 
 	EditBox field() {
-		return onClient(() -> Minecraft.getInstance().screen instanceof ChatScreen s ? ChatPatchesAdapter.get().searchFieldWidget(s) : null);
+		return onClient(() -> Minecraft.getInstance().gui.screen() instanceof ChatScreen s ? ChatPatchesAdapter.get().searchFieldWidget(s) : null);
 	}
 
 	/** Sets Chat Patches' search field as typing would (its responder runs). */
@@ -131,10 +131,10 @@ final class Phase5Tests {
 		Phase2Tests.write(Phase2Tests.cfg(), CONFIG);
 		ctx.runOnClient(c -> {
 			mgr().devSimulateRestart();
-			c.options.hideGui = false;
+			HudState.setHidden(c, false);
 			c.options.chatVisibility().set(ChatVisiblity.FULL);
 			c.options.chatWidth().set(0.4);
-			c.gui.getChat().rescaleChat();
+			c.gui.hud.getChat().rescaleChat();
 		});
 		resetCp();
 		for (String m : new String[]{"apple one cpx#SV-1", "banana two cpx#SV-2", "apple three cpx#SM-1", "Apple four cpx#SM-2", "grape five cpx#SM-3",
@@ -271,7 +271,7 @@ final class Phase5Tests {
 		Map<String, List<Long>> entriesBefore = entries();
 		Map<String, Integer> unreadBefore = unreadAll();
 		byte[] cfgBefore = Phase2Tests.bytes(Phase2Tests.cfg());
-		List<GuiMessage> mainBefore = p3.onClient(() -> new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat())));
+		List<GuiMessage> mainBefore = p3.onClient(() -> new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat())));
 		p3.openChat("");
 		for (String q : new String[]{"a", "ap", "app", "apple", "zzz", "grape", ""}) query(q);
 		ctx.runOnClient(c -> ChatPatches.config.caseSensitive = false);
@@ -282,7 +282,7 @@ final class Phase5Tests {
 		query("");
 		p3.closeChat();
 		boolean same = entries().equals(entriesBefore) && unreadAll().equals(unreadBefore) && Arrays.equals(cfgBefore, Phase2Tests.bytes(Phase2Tests.cfg()))
-				&& AcceptanceTest.sameIdentity(mainBefore, p3.onClient(() -> new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()))));
+				&& AcceptanceTest.sameIdentity(mainBefore, p3.onClient(() -> new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()))));
 		t.sys(sp, "routing after searches cpx#SM-r1");
 		t.waitT(4);
 		boolean routing = t.tabEntries("sm").stream().anyMatch(r -> token(r).equals("cpx#SM-r1"));
@@ -340,7 +340,7 @@ final class Phase5Tests {
 		p3.openChat("");
 		query(".*apple.*");
 		List<String> sv = view("s-v");
-		List<GuiMessage> cpResults = onClient(() -> new ArrayList<>(ChatPatchesAdapter.get().searchResults((ChatScreen) Minecraft.getInstance().screen)));
+		List<GuiMessage> cpResults = onClient(() -> new ArrayList<>(ChatPatchesAdapter.get().searchResults((ChatScreen) Minecraft.getInstance().gui.screen())));
 		boolean onlyCpResults = onClient(() -> ChatOpenRenderer.viewOf("s-v").stream().allMatch(r -> cpResults.stream().anyMatch(g -> g == r.message())));
 		m.put("validQuery.sv", sv);
 		m.put("onlyEntriesInChatPatchesResults", onlyCpResults);
@@ -379,10 +379,10 @@ final class Phase5Tests {
 		Map<String, List<Long>> entriesBefore = entries();
 		Map<String, Integer> unreadBefore = unreadAll();
 		byte[] cfgBefore = Phase2Tests.bytes(Phase2Tests.cfg());
-		List<GuiMessage> mainBefore = onClient(() -> new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat())));
+		List<GuiMessage> mainBefore = onClient(() -> new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat())));
 		query("([unclosed");
 		boolean cpReportsError = onClient(() -> cpSearchError() != null);
-		var regexState = onClient(() -> ChatPatchesAdapter.get().regexState((ChatScreen) Minecraft.getInstance().screen));
+		var regexState = onClient(() -> ChatPatchesAdapter.get().regexState((ChatScreen) Minecraft.getInstance().gui.screen()));
 		List<String> invalidView = view("s-v");
 		List<String> fullSv = onClient(() -> SessionMirror.get().tab("sv").entries().stream().map(Phase5Tests::token).toList());
 		boolean noStale = invalidView.equals(fullSv) && !invalidView.equals(validView);
@@ -420,7 +420,7 @@ final class Phase5Tests {
 		// histories untouched apart from the one new arrival (appended to sv only)
 		entriesAfter.computeIfPresent("sv", (k, v) -> v.subList(0, Math.max(0, v.size() - 1)));
 		boolean preserved = entriesAfter.equals(entriesBefore) && unreadAll().equals(unreadBefore) && Arrays.equals(cfgBefore, Phase2Tests.bytes(Phase2Tests.cfg()));
-		List<GuiMessage> mainAfter = onClient(() -> new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat())));
+		List<GuiMessage> mainAfter = onClient(() -> new ArrayList<>(AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat())));
 		// search never removes or reorders main-chat messages: every earlier message is still there, in order
 		java.util.Set<GuiMessage> beforeSet = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
 		beforeSet.addAll(mainBefore);
@@ -462,7 +462,7 @@ final class Phase5Tests {
 		try {
 			Field f = ChatScreen.class.getDeclaredField("searchError");
 			f.setAccessible(true);
-			return f.get(Minecraft.getInstance().screen);
+			return f.get(Minecraft.getInstance().gui.screen());
 		} catch (ReflectiveOperationException e) {
 			throw new IllegalStateException(e);
 		}
@@ -472,27 +472,27 @@ final class Phase5Tests {
 		Map<String, Object> m = new LinkedHashMap<>();
 		int[] sc = p3.screen();
 		p3.openChat("");
-		int[] field = onClient(() -> ChatPatchesAdapter.get().searchFieldRect((ChatScreen) Minecraft.getInstance().screen));
+		int[] field = onClient(() -> ChatPatchesAdapter.get().searchFieldRect((ChatScreen) Minecraft.getInstance().gui.screen()));
 		double[] pt = {field[0] + 30, field[1] + 5};
 		boolean shownMatches = onClient(() -> Boolean.TRUE.equals(ChatPatchesAdapter.get().isSearchBarShown())) == showSearchBarField();
-		String regionShown = onClient(() -> HitTester.protectedRegion((ChatScreen) Minecraft.getInstance().screen, pt[0], pt[1]));
+		String regionShown = onClient(() -> HitTester.protectedRegion((ChatScreen) Minecraft.getInstance().gui.screen(), pt[0], pt[1]));
 		// hide via the mouse (search button), reopen: still hidden, and the window under the field now gets input
 		p3.click(10, sc[1] - 27, 0);
 		boolean hiddenNow = !showSearchBarField() && Boolean.FALSE.equals(onClient(() -> ChatPatchesAdapter.get().isSearchBarShown()));
 		p3.closeChat();
 		p3.openChat("");
-		String regionHidden = onClient(() -> HitTester.protectedRegion((ChatScreen) Minecraft.getInstance().screen, pt[0], pt[1]));
+		String regionHidden = onClient(() -> HitTester.protectedRegion((ChatScreen) Minecraft.getInstance().gui.screen(), pt[0], pt[1]));
 		var top = onClient(() -> ChatOpenRenderer.topAt(pt[0], pt[1]));
 		boolean windowGets = regionHidden == null && top != null && top.windowId().equals("s-low");
 		// keyboard: Tab doesn't reach the button in chat (command suggestions consume it), so focus it as keyboard
 		// navigation would, then press the real Enter key
 		boolean keyboard = onClient(() -> {
-			var s = Minecraft.getInstance().screen;
+			var s = Minecraft.getInstance().gui.screen();
 			for (var ch : s.children()) if (ch.getClass().getSimpleName().equals("SearchButton")) { s.setFocused(ch); return true; }
 			return false;
 		});
 		if (keyboard) { ctx.getInput().pressKey(InputConstants.KEY_RETURN); t.waitT(2); }
-		boolean stillOpen = onClient(() -> Minecraft.getInstance().screen instanceof ChatScreen);
+		boolean stillOpen = onClient(() -> Minecraft.getInstance().gui.screen() instanceof ChatScreen);
 		boolean keyboardToggled = keyboard && stillOpen && showSearchBarField() && Boolean.TRUE.equals(onClient(() -> ChatPatchesAdapter.get().isSearchBarShown()));
 		p3.closeChat();
 		setShowSearchBar(true);
@@ -503,7 +503,7 @@ final class Phase5Tests {
 		}); ChatPatchesAdapter.get().selfCheck(); });
 		setShowSearchBar(false);
 		p3.openChat("");
-		String reserved = onClient(() -> HitTester.protectedRegion((ChatScreen) Minecraft.getInstance().screen, pt[0], pt[1]));
+		String reserved = onClient(() -> HitTester.protectedRegion((ChatScreen) Minecraft.getInstance().gui.screen(), pt[0], pt[1]));
 		int toasts = onClient(Warnings::toastsShown);
 		boolean degraded = onClient(() -> ChatPatchesAdapter.get().isDegraded());
 		p3.closeChat();
@@ -545,12 +545,12 @@ final class Phase5Tests {
 			boolean searchOff = onClient(() -> !TabSearch.state().active()) && view("s-v").size() >= 2;
 			boolean integrationOff = onClient(() -> ChatPatchesAdapter.get().isSearchIntegrationOff());
 			String region = onClient(() -> {
-				ChatScreen s = (ChatScreen) Minecraft.getInstance().screen;
+				ChatScreen s = (ChatScreen) Minecraft.getInstance().gui.screen();
 				int[] r = ChatPatchesAdapter.get().searchFieldRect(s);
 				return r == null ? null : HitTester.protectedRegion(s, r[0] + 30, r[1] + 5);
 			});
 			boolean cpStillSearches = onClient(() -> {
-				var list = ((obro1961.chatpatches.accessor.ChatScreenAccess) Minecraft.getInstance().screen).getSearchResults();
+				var list = ((obro1961.chatpatches.accessor.ChatScreenAccess) Minecraft.getInstance().gui.screen()).getSearchResults();
 				return list != null && !list.isEmpty();
 			});
 			query("");
@@ -608,7 +608,7 @@ final class Phase5Tests {
 		p3.closeChat();
 		int afterSearch = onClient(Warnings::toastsShown);
 		ctx.runOnClient(c -> { ChatPatchesAdapter.get().devReplaceBackend(new Phase3Tests.DelegatingBackend(real) {
-			@Override public net.minecraft.client.GuiMessageTag restoredIndicator() { return null; }
+			@Override public net.minecraft.client.multiplayer.chat.GuiMessageTag restoredIndicator() { return null; }
 		}); ChatPatchesAdapter.get().selfCheck(); ChatPatches.config.regex = false; });
 		int afterDegraded = onClient(Warnings::toastsShown);
 		for (int i = 0; i < 3; i++) { p3.openChat(""); p3.closeChat(); }
@@ -694,7 +694,7 @@ final class Phase5Tests {
 		try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
 			t.waitT(40);
 			Phase2Tests.write(Phase2Tests.cfg(), cfg);
-			ctx.runOnClient(c -> { mgr().devSimulateRestart(); ChatPatches.config.chatMaxMessages = 16384; c.options.hideGui = false; });
+			ctx.runOnClient(c -> { mgr().devSimulateRestart(); ChatPatches.config.chatMaxMessages = 16384; HudState.setHidden(c, false); });
 			resetCp();
 			// 16,384 messages over 10 tabs; even ones contain "alpha"
 			for (int chunk = 0; chunk < 16; chunk++) {
@@ -702,7 +702,7 @@ final class Phase5Tests {
 				ctx.runOnClient(c -> {
 					for (int i = 0; i < 1024; i++) {
 						int n = base + i;
-						c.gui.getChat().addMessage(Component.literal((n % 2 == 0 ? "alpha " : "beta ") + "flood " + n + " cpx#P" + (n % 10) + "-" + n));
+						c.gui.hud.getChat().addClientSystemMessage(Component.literal((n % 2 == 0 ? "alpha " : "beta ") + "flood " + n + " cpx#P" + (n % 10) + "-" + n));
 					}
 				});
 			}
@@ -781,7 +781,7 @@ final class Phase5Tests {
 					&& rebuildsRegex == 0 && renderMaxRegex < 16.7 && regexIndicator == TabSearch.Indicator.PARTIAL;
 			if (hiding) {
 				m.put("hiddenRetained", onClient(() -> SessionMirror.get().hiddenSize()));
-				m.put("mainChatSize", onClient(() -> AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()).size()));
+				m.put("mainChatSize", onClient(() -> AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()).size()));
 			}
 			ev.result(hiding ? "V-13.mixedHiding" : "V-13", ok, "observed", m, "criteria", "Extended's chat-open render under one 60 fps frame (16.7 ms) at every frame; no full rebuilds from arrivals (incremental only); rebuilds only on query changes (<= visible windows per change)",
 					"note", "extendedRenderAllocated* covers Extended's whole chat-open render call (vanilla text drawing included); wholeClientThread* is everything on the client thread over the 10 s (vanilla and Chat Patches included); mixed hiding is Phase 7");

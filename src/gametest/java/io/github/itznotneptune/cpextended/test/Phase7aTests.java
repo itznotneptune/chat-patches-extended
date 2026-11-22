@@ -19,7 +19,7 @@ import io.github.itznotneptune.cpextended.gui.ConfigScreen;
 import io.github.itznotneptune.cpextended.gui.WindowScreen;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
-import net.minecraft.client.GuiMessage;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.gui.screens.ChatScreen;
@@ -104,7 +104,7 @@ final class Phase7aTests {
 	Dump dump() {
 		byte[] cfg = Phase2Tests.bytes(Phase2Tests.cfg());
 		return onClient(() -> {
-			ChatComponent chat = Minecraft.getInstance().gui.getChat();
+			ChatComponent chat = Minecraft.getInstance().gui.hud.getChat();
 			List<GuiMessage> live = AcceptanceTest.allMessagesReflective(chat);
 			Map<String, List<Long>> tabs = new LinkedHashMap<>();
 			Map<String, Integer> unread = new LinkedHashMap<>();
@@ -126,7 +126,7 @@ final class Phase7aTests {
 		ctx.runOnClient(c -> {
 			mgr().devSimulateRestart();
 			ChatPatches.config.chatMaxMessages = 60;
-			c.gui.getChat().clearMessages(false); // a known main chat (restored history from earlier modes dropped)
+			c.gui.hud.getChat().clearMessages(false); // a known main chat (restored history from earlier modes dropped)
 		});
 		t.waitT(3);
 	}
@@ -170,7 +170,7 @@ final class Phase7aTests {
 
 	/** Main chat, newest first, as fixture tokens. */
 	List<String> mainTokens() {
-		return onClient(() -> AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()).stream().map(g -> token(g.content().getString())).toList());
+		return onClient(() -> AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()).stream().map(g -> token(g.content().getString())).toList());
 	}
 
 	static String token(String s) {
@@ -188,7 +188,7 @@ final class Phase7aTests {
 			try {
 				Field f = ChatComponent.class.getDeclaredField("trimmedMessages");
 				f.setAccessible(true);
-				@SuppressWarnings("unchecked") List<GuiMessage.Line> l = (List<GuiMessage.Line>) f.get(Minecraft.getInstance().gui.getChat());
+				@SuppressWarnings("unchecked") List<GuiMessage.Line> l = (List<GuiMessage.Line>) f.get(Minecraft.getInstance().gui.hud.getChat());
 				List<String> out = new ArrayList<>();
 				for (GuiMessage.Line line : l) out.add(line.addedTime() + "|" + text(line.content()) + "|" + line.endOfEntry());
 				return out;
@@ -206,7 +206,7 @@ final class Phase7aTests {
 
 	/** Lines as a fresh rebuild of the same main chat would produce them (reference for V-20o). */
 	List<String> referenceLines() {
-		ctx.runOnClient(c -> c.gui.getChat().rescaleChat());
+		ctx.runOnClient(c -> c.gui.hud.getChat().rescaleChat());
 		return lines();
 	}
 
@@ -264,7 +264,7 @@ final class Phase7aTests {
 		List<String> main = mainTokens();
 		boolean order = main.subList(0, 5).equals(List.of("cpx#V3", "cpx#H1-b", "cpx#V2", "cpx#H1-a", "cpx#V1"));
 		boolean identity = onClient(() -> {
-			List<GuiMessage> all = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat());
+			List<GuiMessage> all = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat());
 			return all.get(1) == h2.message() && all.get(3) == h1.message();
 		});
 		boolean flags = onClient(() -> !h1.hidden() && !h2.hidden() && h1.tabIds().isEmpty() && SessionMirror.get().hiddenSize() == 0
@@ -282,11 +282,11 @@ final class Phase7aTests {
 		p4.open(() -> new ChatScreen("", false));
 		t.waitT(2);
 		Map<String, Object> hit = onClient(() -> {
-			List<GuiMessage> all = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat());
+			List<GuiMessage> all = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat());
 			Map<String, Object> r = new LinkedHashMap<>();
 			int found = 0;
 			for (int y = Minecraft.getInstance().getWindow().getGuiScaledHeight() - 30; y > 20 && found < 5; y -= 9) {
-				int idx = ((obro1961.chatpatches.accessor.ChatComponentAccess) Minecraft.getInstance().gui.getChat()).getEoEIndex(10, y);
+				int idx = ((obro1961.chatpatches.accessor.ChatComponentAccess) Minecraft.getInstance().gui.hud.getChat()).getEoEIndex(10, y);
 				if (idx >= 0 && idx < all.size()) { r.put("y" + y, token(all.get(idx).content().getString())); found++; }
 			}
 			return r;
@@ -321,7 +321,7 @@ final class Phase7aTests {
 		p4.open(ws);
 		boolean shown = false;
 		// the Delete button of the qx row (rows are in tab order qv, qh, qs, qx), clicked with the real mouse
-		List<net.minecraft.client.gui.components.AbstractWidget> dels = onClient(() -> Minecraft.getInstance().screen.children().stream()
+		List<net.minecraft.client.gui.components.AbstractWidget> dels = onClient(() -> Minecraft.getInstance().gui.screen().children().stream()
 				.filter(w -> w instanceof net.minecraft.client.gui.components.AbstractWidget a && a.getMessage().getString().equals("Delete"))
 				.map(w -> (net.minecraft.client.gui.components.AbstractWidget) w).toList());
 		if (dels.size() >= 4) {
@@ -329,7 +329,7 @@ final class Phase7aTests {
 			p3.click(b.getX() + b.getWidth() / 2.0, b.getY() + b.getHeight() / 2.0, 0);
 			t.waitT(2);
 			p4.press("Yes");
-			shown = onClient(() -> Minecraft.getInstance().screen instanceof ConfirmScreen cs && cs.getTitle().getString().contains("hidden messages"));
+			shown = onClient(() -> Minecraft.getInstance().gui.screen() instanceof ConfirmScreen cs && cs.getTitle().getString().contains("hidden messages"));
 			p4.press("No");
 		}
 		Dump after = dump();
@@ -392,7 +392,7 @@ final class Phase7aTests {
 		boolean capKept = afterMain.size() <= 60;
 		t.waitT(3);
 		boolean tabsFollow = onClient(() -> SessionMirror.get().tabStates().stream().flatMap(s -> s.entries().stream())
-				.allMatch(r -> r.hidden() || AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()).stream().anyMatch(g -> g == r.message())));
+				.allMatch(r -> r.hidden() || AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()).stream().anyMatch(g -> g == r.message())));
 		m.put("2.survive", row("disclosedPruned", c2.pruned(), "actualPruned", prunedActual.size(), "prunedTokens", prunedActual, "applied", o2.applied(),
 				"orphansInMainChat", survivors, "mainChatSize", afterMain.size(), "tabsFollowLiveness", tabsFollow));
 		boolean ok2 = !c2.refused() && c2.restored() == 3 && o2.applied() && c2.pruned() == prunedActual.size() && c2.pruned() == 3 && survivors && capKept && tabsFollow;
@@ -467,11 +467,11 @@ final class Phase7aTests {
 				}
 				default -> c = onClient(() -> {
 					// a real capture frame: Extended is processing an incoming message
-					Capture.enter(Minecraft.getInstance().gui.getChat(), Component.literal("frame"), null);
+					Capture.enter(Minecraft.getInstance().gui.hud.getChat(), Component.literal("frame"), null);
 					try {
 						return mgr().checkEdits(List.of(new ConfigEdit.DeleteTab("qx")));
 					} finally {
-						Capture.exit(Minecraft.getInstance().gui.getChat());
+						Capture.exit(Minecraft.getInstance().gui.hud.getChat());
 					}
 				});
 			}
@@ -610,7 +610,7 @@ final class Phase7aTests {
 		List<String> observedAtSwap = new ArrayList<>();
 		ctx.runOnClient(c -> OrphanRestore.devSetCommitProbe(() -> {
 			// inside the commit, between the swaps and the rename: the new state must already be complete
-			boolean inMain = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()).contains(h.message());
+			boolean inMain = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()).contains(h.message());
 			observedAtSwap.add("inMain=" + inMain + ",hidden=" + h.hidden() + ",tabGone=" + (SessionMirror.get().tab("qx") == null)
 					+ ",configHasTab=" + (mgr().config().windowOfTab("qx") != null) + ",tick=" + ticks.get());
 		}));
@@ -642,10 +642,10 @@ final class Phase7aTests {
 		WindowScreen ws = onClient(() -> new WindowScreen(new ConfigScreen(null), "q-b"));
 		p4.open(ws);
 		p4.press("Delete window");
-		boolean choice = onClient(() -> Minecraft.getInstance().screen instanceof io.github.itznotneptune.cpextended.gui.DeleteWindowScreen);
-		ctx.runOnClient(c -> ((io.github.itznotneptune.cpextended.gui.DeleteWindowScreen) Minecraft.getInstance().screen).choose("qm", "q-a"));
+		boolean choice = onClient(() -> Minecraft.getInstance().gui.screen() instanceof io.github.itznotneptune.cpextended.gui.DeleteWindowScreen);
+		ctx.runOnClient(c -> ((io.github.itznotneptune.cpextended.gui.DeleteWindowScreen) Minecraft.getInstance().gui.screen()).choose("qm", "q-a"));
 		p4.press("Delete window");
-		boolean disclosed = onClient(() -> Minecraft.getInstance().screen instanceof ConfirmScreen);
+		boolean disclosed = onClient(() -> Minecraft.getInstance().gui.screen() instanceof ConfirmScreen);
 		p4.press("Yes");
 		boolean windowGone = onClient(() -> mgr().config().window("q-b") == null);
 		boolean moved = "q-a".equals(onClient(() -> { var w = mgr().config().windowOfTab("qm"); return w == null ? null : w.id(); }));
@@ -736,24 +736,24 @@ final class Phase7aTests {
 		visible(sp, "before m cpx#V-m1");
 		hidden("restored target cpx#X-m", "qx");
 		visible(sp, "after m cpx#V-m2");
-		List<GuiMessage> cached = onClient(() -> AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()));
+		List<GuiMessage> cached = onClient(() -> AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()));
 		ConfigManager.OrphanCheck c = check(new ConfigEdit.DeleteTab("qx"));
 		confirm(c, new ConfigEdit.DeleteTab("qx"));
-		List<GuiMessage> now = onClient(() -> AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat()));
+		List<GuiMessage> now = onClient(() -> AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat()));
 		m.put("V-20n.cachedListIsOldObject", cached != now);
 		m.put("V-20n.cachedListStale", cached.stream().noneMatch(g -> g.content().getString().contains("cpx#X-m")));
 		// Chat Patches search on the new list (plain), drafted on reopen
 		p4.open(() -> new ChatScreen("", false));
 		t.waitT(2);
 		ctx.runOnClient(x -> {
-			var f = ChatPatchesAdapter.get().searchFieldWidget((ChatScreen) Minecraft.getInstance().screen);
+			var f = ChatPatchesAdapter.get().searchFieldWidget((ChatScreen) Minecraft.getInstance().gui.screen());
 			if (f != null) f.setValue("restored target");
 		});
 		t.waitT(2);
-		List<String> results = onClient(() -> ((obro1961.chatpatches.accessor.ChatScreenAccess) Minecraft.getInstance().screen).getSearchResults().stream()
+		List<String> results = onClient(() -> ((obro1961.chatpatches.accessor.ChatScreenAccess) Minecraft.getInstance().gui.screen()).getSearchResults().stream()
 				.map(g -> token(g.content().getString())).toList());
 		ctx.runOnClient(x -> {
-			var f = ChatPatchesAdapter.get().searchFieldWidget((ChatScreen) Minecraft.getInstance().screen);
+			var f = ChatPatchesAdapter.get().searchFieldWidget((ChatScreen) Minecraft.getInstance().gui.screen());
 			if (f != null) f.setValue("");
 		});
 		ctx.setScreen(() -> null);
@@ -816,7 +816,7 @@ final class Phase7aTests {
 			t.waitT(60);
 			int after = onClient(Phase6Tests::boundaryCount);
 			boolean newestIsBoundary = onClient(() -> {
-				var all = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.getChat());
+				var all = AcceptanceTest.allMessagesReflective(Minecraft.getInstance().gui.hud.getChat());
 				return !all.isEmpty() && Boolean.TRUE.equals(ChatPatchesAdapter.get().isBoundaryLine(all.get(0).content()));
 			});
 			m.put("boundariesAfterSwitch", after);

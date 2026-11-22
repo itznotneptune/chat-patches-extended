@@ -16,7 +16,7 @@ import io.github.itznotneptune.cpextended.search.TabSearch;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.GuiMessage;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.ChatScreen;
@@ -57,7 +57,7 @@ final class ProdTests {
 	ConfigManager mgr() { return ConfigManager.get(); }
 
 	/** The main chat through Extended's own accessor (Mojang field names don't exist in production). */
-	List<GuiMessage> main() { return onClient(() -> new ArrayList<>(((ChatComponentAccessor) Minecraft.getInstance().gui.getChat()).cpextended$getAllMessages())); }
+	List<GuiMessage> main() { return onClient(() -> new ArrayList<>(((ChatComponentAccessor) Minecraft.getInstance().gui.hud.getChat()).cpextended$getAllMessages())); }
 
 	boolean inMain(String tok) { return main().stream().anyMatch(g -> g.content().getString().contains(tok)); }
 
@@ -81,7 +81,7 @@ final class ProdTests {
 
 	String windowOfTab(String tabId) { return onClient(() -> { var w = mgr().config().windowOfTab(tabId); return w == null ? null : w.id(); }); }
 
-	Screen screen() { return onClient(() -> Minecraft.getInstance().screen); }
+	Screen screen() { return onClient(() -> Minecraft.getInstance().gui.screen()); }
 
 	// ================================================================ prod1
 
@@ -98,7 +98,7 @@ final class ProdTests {
 				&& Boolean.TRUE.equals(env.get("configCreatedAtLaunch")) && Boolean.TRUE.equals(env.get("defaultConfigHasNoWindows")), "observed", env);
 		try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
 			t.waitT(60);
-			ctx.runOnClient(c -> { ChatPatches.config.boundary = true; c.options.hideGui = false; });
+			ctx.runOnClient(c -> { ChatPatches.config.boundary = true; HudState.setHidden(c, false); });
 			createViaGui(sp);
 			backupGenerated();
 			routingAndHiding(sp);
@@ -248,7 +248,7 @@ final class ProdTests {
 		t.waitT(4);
 		String w = windowOfTab(all);
 		p3.openChat("");
-		EditBox f = onClient(() -> ChatPatchesAdapter.get().searchFieldWidget((ChatScreen) Minecraft.getInstance().screen));
+		EditBox f = onClient(() -> ChatPatchesAdapter.get().searchFieldWidget((ChatScreen) Minecraft.getInstance().gui.screen()));
 		p3.click(f.getX() + 4, f.getY() + 4, 0);
 		ctx.getInput().typeChars("apple");
 		t.waitT(3);
@@ -294,13 +294,13 @@ final class ProdTests {
 		ctx.takeScreenshot("rc2-prod-settings-populated");
 		String w = windowOfTab(smoke);
 		p4.open(() -> new WindowScreen(new ConfigScreen(null), w));
-		String windowTitle = onClient(() -> Minecraft.getInstance().screen.getTitle().getString());
+		String windowTitle = onClient(() -> Minecraft.getInstance().gui.screen().getTitle().getString());
 		ctx.takeScreenshot("rc2-prod-window-screen-populated");
 		p4.press("Delete");
-		String confirm = onClient(() -> Minecraft.getInstance().screen.getNarrationMessage().getString());
+		String confirm = onClient(() -> Minecraft.getInstance().gui.screen().getNarrationMessage().getString());
 		ctx.takeScreenshot("rc2-prod-delete-confirm");
 		p4.press("Yes");
-		String disclosureText = onClient(() -> Minecraft.getInstance().screen.getNarrationMessage().getString());
+		String disclosureText = onClient(() -> Minecraft.getInstance().gui.screen().getNarrationMessage().getString());
 		ctx.takeScreenshot("rc2-prod-orphan-disclosure");
 		boolean disclosure = screen() instanceof net.minecraft.client.gui.screens.ConfirmScreen;
 		p4.press("No");
@@ -328,7 +328,7 @@ final class ProdTests {
 	List<String> labels() {
 		return onClient(() -> {
 			List<String> out = new ArrayList<>();
-			for (var ch : Minecraft.getInstance().screen.children()) if (ch instanceof net.minecraft.client.gui.components.AbstractWidget aw) out.add(aw.getMessage().getString());
+			for (var ch : Minecraft.getInstance().gui.screen().children()) if (ch instanceof net.minecraft.client.gui.components.AbstractWidget aw) out.add(aw.getMessage().getString());
 			return out;
 		});
 	}
@@ -338,7 +338,7 @@ final class ProdTests {
 			t.waitT(60);
 			int smokeEntries = onClient(() -> SessionMirror.get().tab(smoke).size());
 			boolean boundary = onClient(() -> {
-				var all0 = ((ChatComponentAccessor) Minecraft.getInstance().gui.getChat()).cpextended$getAllMessages();
+				var all0 = ((ChatComponentAccessor) Minecraft.getInstance().gui.hud.getChat()).cpextended$getAllMessages();
 				return !all0.isEmpty() && Boolean.TRUE.equals(ChatPatchesAdapter.get().isBoundaryLine(all0.get(0).content()));
 			});
 			t.sys(sp, "after reconnect cpx#SM-5");
@@ -382,14 +382,14 @@ final class ProdTests {
 		boolean restoreActive = onClient(() -> { var b = Rc2Tests.widgetNow("Restore from backup"); return b != null && b.active; });
 		String restoreTip = onClient(() -> { var b = Rc2Tests.widgetNow("Restore from backup"); return b == null ? null : Rc2Tests.tooltip(b); });
 		boolean replaceOffered = p4.widget("Replace file") != null;
-		ctx.runOnClient(c -> c.getToastManager().clear());
+		ctx.runOnClient(c -> c.gui.toastManager().clear());
 		t.waitT(2);
 		ctx.takeScreenshot("rc2-prod-recovery-screen");
 		boolean restored = false;
 		String confirmText = null;
 		if (restoreActive) {
 			p4.press("Restore from backup");
-			confirmText = onClient(() -> Minecraft.getInstance().screen.getNarrationMessage().getString());
+			confirmText = onClient(() -> Minecraft.getInstance().gui.screen().getNarrationMessage().getString());
 			ctx.takeScreenshot("rc2-prod-restore-confirm");
 			p4.press("Yes");
 			restored = true;

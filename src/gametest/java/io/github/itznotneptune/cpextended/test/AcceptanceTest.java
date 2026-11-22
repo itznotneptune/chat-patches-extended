@@ -28,8 +28,8 @@ import io.github.itznotneptune.cpextended.test.Evidence.Outcome;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
-import net.minecraft.client.GuiMessage;
-import net.minecraft.client.GuiMessageTag;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
+import net.minecraft.client.multiplayer.chat.GuiMessageTag;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.gui.components.EditBox;
@@ -173,7 +173,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 	}
 
 	void local(String text) {
-		ctx.runOnClient(c -> c.gui.getChat().addMessage(Component.literal(text)));
+		ctx.runOnClient(c -> c.gui.hud.getChat().addClientSystemMessage(Component.literal(text)));
 	}
 
 	List<Rec> recs() {
@@ -222,19 +222,19 @@ public final class AcceptanceTest implements FabricClientGameTest {
 	}
 
 	List<GuiMessage> allMessages() {
-		return ctx.computeOnClient(c -> new ArrayList<>(allMessagesReflective(c.gui.getChat())));
+		return ctx.computeOnClient(c -> new ArrayList<>(allMessagesReflective(c.gui.hud.getChat())));
 	}
 
 	boolean inMainChat(GuiMessage m) {
 		return ctx.computeOnClient(c -> {
-			for (GuiMessage g : allMessagesReflective(c.gui.getChat())) if (g == m) return true;
+			for (GuiMessage g : allMessagesReflective(c.gui.hud.getChat())) if (g == m) return true;
 			return false;
 		});
 	}
 
 	boolean mainChatContains(String text) {
 		return ctx.computeOnClient(c -> {
-			for (GuiMessage g : allMessagesReflective(c.gui.getChat())) if (g.content().getString().contains(text)) return true;
+			for (GuiMessage g : allMessagesReflective(c.gui.hud.getChat())) if (g.content().getString().contains(text)) return true;
 			return false;
 		});
 	}
@@ -278,7 +278,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 	MessageRecord hideFixture(String text, String... tabs) {
 		return ctx.computeOnClient(c -> {
 			Component comp = Component.literal(text);
-			GuiMessage g = new GuiMessage(c.gui.getGuiTicks(), comp, null, null);
+			GuiMessage g = new GuiMessage(c.gui.hud.getGuiTicks(), comp, null, net.minecraft.client.multiplayer.chat.GuiMessageSource.SYSTEM_CLIENT, null);
 			return SessionMirror.get().devAddHidden(g, comp, List.of(tabs));
 		});
 	}
@@ -301,7 +301,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 			v05();
 			v25b(sp);
 			List<String> run1 = v22Script(sp);
-			ctx.runOnClient(c -> c.gui.getChat().clearMessages(false));
+			ctx.runOnClient(c -> c.gui.hud.getChat().clearMessages(false));
 			waitT(5);
 			List<String> run2 = v22Script(sp);
 			ev.data("v22_run", "run", "live-1", "routing", run1);
@@ -522,15 +522,15 @@ public final class AcceptanceTest implements FabricClientGameTest {
 	void v05() {
 		int recordsBefore = ctx.computeOnClient(c -> SessionMirror.get().size());
 		int frameless0 = TestCounters.FRAMELESS_DISPLAY.get();
-		ctx.runOnClient(c -> c.gui.getChat().rescaleChat());
+		ctx.runOnClient(c -> c.gui.hud.getChat().rescaleChat());
 		waitT(2);
 		int afterRescale = TestCounters.FRAMELESS_DISPLAY.get();
 		ctx.runOnClient(c -> {
 			int old = c.options.guiScale().get();
 			c.options.guiScale().set(old == 2 ? 3 : 2);
-			c.resizeDisplay();
+			c.resizeGui();
 			c.options.guiScale().set(old);
-			c.resizeDisplay();
+			c.resizeGui();
 		});
 		waitT(4);
 		int afterScale = TestCounters.FRAMELESS_DISPLAY.get();
@@ -542,7 +542,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 			try {
 				Field f = ChatScreen.class.getDeclaredField("searchField");
 				f.setAccessible(true);
-				EditBox box = (EditBox) f.get(c.screen);
+				EditBox box = (EditBox) f.get(c.gui.screen());
 				if (box == null) return "search field null";
 				box.setValue("cpx#V24");
 				box.setValue("");
@@ -669,7 +669,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 		for (int i = 0; i < 5; i++) {
 			long dt = ctx.computeOnClient(c -> {
 				long t0 = System.nanoTime();
-				c.gui.getChat().addMessage(Component.literal(text));
+				c.gui.hud.getChat().addClientSystemMessage(Component.literal(text));
 				return System.nanoTime() - t0;
 			});
 			best = Math.min(best, dt);
@@ -695,7 +695,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 	/** Routing must not change what the main chat holds: same messages, same order, no tabs vs routing tabs. */
 	void structuralNoTabsVsTabs(TestSingleplayerContext sp) {
 		Function<String, List<String>> run = suffix -> {
-			ctx.runOnClient(c -> c.gui.getChat().clearMessages(false));
+			ctx.runOnClient(c -> c.gui.hud.getChat().clearMessages(false));
 			waitT(3);
 			for (int i = 0; i < 6; i++) sys(sp, "struct " + i + " cpx#ST-" + i);
 			sys(sp, "struct dup cpx#ST-dup");
@@ -721,9 +721,9 @@ public final class AcceptanceTest implements FabricClientGameTest {
 		Rec r = one("cpx#RET-1");
 		boolean inTabBefore = r != null && tabEntries("tok").stream().anyMatch(e -> e == r.ref());
 		ctx.runOnClient(c -> {
-			List<GuiMessage> all = allMessagesReflective(c.gui.getChat());
+			List<GuiMessage> all = allMessagesReflective(c.gui.hud.getChat());
 			all.removeIf(g -> g == r.msg());
-			c.gui.getChat().rescaleChat();
+			c.gui.hud.getChat().rescaleChat();
 		});
 		waitT(3);
 		boolean goneFromTab = r != null && tabEntries("tok").stream().noneMatch(e -> e == r.ref());
@@ -776,7 +776,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 			List<Rec> restored = all.stream().filter(r -> r.origin() == Origin.RESTORED).toList();
 			long mainChatRestored = ctx.computeOnClient(c -> {
 				var tag = ChatPatchesAdapter.get().restoredTag();
-				return allMessagesReflective(c.gui.getChat()).stream().filter(g -> g.tag() == tag).count();
+				return allMessagesReflective(c.gui.hud.getChat()).stream().filter(g -> g.tag() == tag).count();
 			});
 			long liveTaggedRestored = restored.stream().filter(r -> r.token() != null && r.token().startsWith("cpx#L")).count();
 			long bulkAsLive = all.stream().filter(r -> r.origin() == Origin.LIVE && r.token() != null && r.token().startsWith("cpx#B")).count();
@@ -844,7 +844,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 		int mirror = ctx.computeOnClient(c -> SessionMirror.get().size());
 		int main = allMessages().size();
 		int tab = tabEntries("tok").size();
-		long tokensAlive = ctx.computeOnClient(c -> allMessagesReflective(c.gui.getChat()).stream().filter(g -> g.content().getString().contains("cpx#")).count());
+		long tokensAlive = ctx.computeOnClient(c -> allMessagesReflective(c.gui.hud.getChat()).stream().filter(g -> g.content().getString().contains("cpx#")).count());
 		boolean eventsOk = !events.isEmpty() && events.stream().allMatch(e -> Boolean.valueOf(expectedCleared).equals(e.get("cleared"))
 				&& Boolean.valueOf(expectedCleared).equals(e.get("observedEmpty")));
 		boolean ok = eventsOk && mirror == main && tab == tokensAlive && (expectedCleared ? main == 0 && tab == 0 : main > 0);
@@ -915,7 +915,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 
 				if (f == Fault.VANILLA_CLEARING_MISSING) {
 					// Clearing while vanillaClearing is unreadable follows the observed main chat.
-					ctx.runOnClient(c -> c.gui.getChat().clearMessages(false));
+					ctx.runOnClient(c -> c.gui.hud.getChat().clearMessages(false));
 					waitT(3);
 					int mirror = ctx.computeOnClient(c -> SessionMirror.get().size());
 					int main = allMessages().size();
@@ -989,7 +989,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 			@Override public boolean searchCaseSensitive() { return real.searchCaseSensitive(); }
 			@Override public boolean searchRegex() { return real.searchRegex(); }
 			@Override public boolean searchEmptyShowsFullChat() { return real.searchEmptyShowsFullChat(); }
-			@Override public java.util.List<net.minecraft.client.GuiMessage> searchResults(ChatScreen s) { return real.searchResults(s); }
+			@Override public java.util.List<net.minecraft.client.multiplayer.chat.GuiMessage> searchResults(ChatScreen s) { return real.searchResults(s); }
 			@Override public Object searchError(java.lang.reflect.Field h, ChatScreen s) throws ReflectiveOperationException { return real.searchError(h, s); }
 		};
 	}
@@ -1015,17 +1015,17 @@ public final class AcceptanceTest implements FabricClientGameTest {
 			Rec r = one("cpx#CF-1");
 			routed = r != null && r.tabs().contains("tok") && inMainChat(r.msg());
 			// with a query typed in regex mode (valid and invalid), tab search stays off and nothing fails further
-			ctx.runOnClient(c -> { ChatPatches.config.regex = true; c.setScreen(new ChatScreen("", false)); });
+			ctx.runOnClient(c -> { ChatPatches.config.regex = true; c.gui.setScreen(new ChatScreen("", false)); });
 			waitT(3);
 			for (String q : new String[]{".*conflict.*", "([bad"}) {
 				ctx.runOnClient(c -> {
-					var box = ChatPatchesAdapter.get().searchFieldWidget((ChatScreen) c.screen);
+					var box = ChatPatchesAdapter.get().searchFieldWidget((ChatScreen) c.gui.screen());
 					if (box != null) box.setValue(q);
 				});
 				waitT(3);
 				st.put("tabSearchActive:" + q, ctx.computeOnClient(c -> io.github.itznotneptune.cpextended.search.TabSearch.state().active()));
 			}
-			ctx.runOnClient(c -> { c.setScreen(null); ChatPatches.config.regex = false; });
+			ctx.runOnClient(c -> { c.gui.setScreen(null); ChatPatches.config.regex = false; });
 			st.put("toastsAfterQueries", ctx.computeOnClient(c -> Warnings.toastsShown()));
 		}
 		String expectOp = mode.equals("conflict_error") ? "SEARCH_ERROR" : "SEARCH_VISIBILITY";
@@ -1050,7 +1050,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 		state.put("devDisabled", DevHooks.disabled());
 		state.put("diagnosticsEnabled", Diagnostics.ENABLED);
 		// By name: in structural_off the accessor isn't applied, and Mixin forbids loading a mixin-package class directly.
-		state.put("accessorApplied", ctx.computeOnClient(c -> java.util.Arrays.stream(c.gui.getChat().getClass().getInterfaces())
+		state.put("accessorApplied", ctx.computeOnClient(c -> java.util.Arrays.stream(c.gui.hud.getChat().getClass().getInterfaces())
 				.anyMatch(i -> i.getName().endsWith("ChatComponentAccessor"))));
 		List<String> main = new ArrayList<>();
 		try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
@@ -1064,7 +1064,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 			main = ctx.computeOnClient(c -> {
 				List<String> out = new ArrayList<>();
 				var ops = RegistryOps.create(JsonOps.INSTANCE, c.level.registryAccess());
-				for (GuiMessage g : allMessagesReflective(c.gui.getChat())) {
+				for (GuiMessage g : allMessagesReflective(c.gui.hud.getChat())) {
 					String json = ComponentSerialization.CODEC.encodeStart(ops, g.content()).getOrThrow().toString();
 					out.add(json + "|tag=" + (g.tag() == null ? "none" : "present") + "|sig=" + (g.signature() != null));
 				}
@@ -1140,7 +1140,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 	record Snap(List<GuiMessage> main, int chatLog) {}
 
 	Snap snap(Minecraft c) {
-		return new Snap(new ArrayList<>(allMessagesReflective(c.gui.getChat())), ChatLog.messageCount());
+		return new Snap(new ArrayList<>(allMessagesReflective(c.gui.hud.getChat())), ChatLog.messageCount());
 	}
 
 	static boolean sameIdentity(List<GuiMessage> a, List<GuiMessage> b) {
@@ -1152,7 +1152,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 	/** Mirror = main chat entry for entry; tabs hold only live records, in mirror order, each once, each with its tab id. */
 	Map<String, Object> invariants() {
 		return ctx.computeOnClient(c -> {
-			List<GuiMessage> all = allMessagesReflective(c.gui.getChat());
+			List<GuiMessage> all = allMessagesReflective(c.gui.hud.getChat());
 			List<MessageRecord> recs = SessionMirror.get().records();
 			boolean aligned = recs.size() == all.size();
 			for (int i = 0; aligned && i < recs.size(); i++) aligned = recs.get(i).message() == all.get(all.size() - 1 - i);
@@ -1182,7 +1182,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 	/** Applies a main-chat mutation as another mod would, then runs two reconcile passes in the same client task. */
 	Map<String, Object> mutateAndReconcile(java.util.function.Consumer<List<GuiMessage>> mutation) {
 		return ctx.computeOnClient(c -> {
-			ChatComponent chat = c.gui.getChat();
+			ChatComponent chat = c.gui.hud.getChat();
 			mutation.accept(allMessagesReflective(chat));
 			chat.rescaleChat();
 			Snap before = snap(c);
@@ -1200,12 +1200,12 @@ public final class AcceptanceTest implements FabricClientGameTest {
 	}
 
 	GuiMessage foreign(Minecraft c, String text) {
-		return new GuiMessage(c.gui.getGuiTicks(), Component.literal(text), null, null);
+		return new GuiMessage(c.gui.hud.getGuiTicks(), Component.literal(text), null, net.minecraft.client.multiplayer.chat.GuiMessageSource.SYSTEM_CLIENT, null);
 	}
 
 	GuiMessage mainEntry(String token) {
 		return ctx.computeOnClient(c -> {
-			for (GuiMessage g : allMessagesReflective(c.gui.getChat())) if (g.content().getString().contains(token)) return g;
+			for (GuiMessage g : allMessagesReflective(c.gui.hud.getChat())) if (g.content().getString().contains(token)) return g;
 			return null;
 		});
 	}
@@ -1268,7 +1268,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 
 			// 4. Abandoned capture frames (development hook: frames opened and never closed).
 			Map<String, Object> ab = ctx.computeOnClient(c -> {
-				ChatComponent chat = c.gui.getChat();
+				ChatComponent chat = c.gui.hud.getChat();
 				Capture.devAbandonFrame(chat, Component.literal("abandoned before decision cpx#AB-0"), 0);
 				Capture.devAbandonFrame(chat, Component.literal("abandoned after decision cpx#AB-1"), 1);
 				Capture.devAbandonFrame(chat, Component.literal("abandoned after delivery cpx#AB-2"), 2);
@@ -1296,7 +1296,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 			waitT(4);
 			boolean threw = ctx.computeOnClient(c -> {
 				try {
-					c.gui.getChat().addMessage(Component.literal("[THROW-Q] interrupted cpx#PT"));
+					c.gui.hud.getChat().addClientSystemMessage(Component.literal("[THROW-Q] interrupted cpx#PT"));
 					return false;
 				} catch (RuntimeException e) {
 					return true;
@@ -1336,7 +1336,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 			for (int chunk = 0; chunk < 16; chunk++) {
 				int base = chunk * 1024;
 				ctx.runOnClient(c -> {
-					for (int i = 0; i < 1024; i++) c.gui.getChat().addMessage(Component.literal("bulk16k " + (base + i) + " cpx#K16-" + (base + i)));
+					for (int i = 0; i < 1024; i++) c.gui.hud.getChat().addClientSystemMessage(Component.literal("bulk16k " + (base + i) + " cpx#K16-" + (base + i)));
 				});
 			}
 			waitT(5);

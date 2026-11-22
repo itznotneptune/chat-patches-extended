@@ -5,7 +5,7 @@ import io.github.itznotneptune.cpextended.CpExtended;
 import io.github.itznotneptune.cpextended.compat.ChatPatchesAdapter;
 import io.github.itznotneptune.cpextended.dev.DevHooks;
 import io.github.itznotneptune.cpextended.mixin.ChatComponentAccessor;
-import net.minecraft.client.GuiMessage;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.gui.screens.ChatScreen;
@@ -147,7 +147,7 @@ public final class OrphanRestore {
 
 		Minecraft mc = Minecraft.getInstance();
 		ChatPatchesAdapter adapter = ChatPatchesAdapter.get();
-		boolean safe = mc.isSameThread() && !(mc.screen instanceof ChatScreen) && Capture.depth() == 0 && adapter.isSafePoint()
+		boolean safe = mc.isSameThread() && !(mc.gui.screen() instanceof ChatScreen) && Capture.depth() == 0 && adapter.isSafePoint()
 				&& !(devForceBusy && DevHooks.isDev());
 		if (!safe) {
 			return new Refused(Refusal.BUSY, "Chat is busy (open, loading or restoring its history), so the hidden messages in " + describe.apply(withOrphans)
@@ -159,7 +159,7 @@ public final class OrphanRestore {
 					+ describe.apply(withOrphans) + " back to the main chat can't be checked for loss. Nothing was changed. " + KEEP_DISABLE_MOVE);
 		}
 		int cap = capRead.getAsInt();
-		ChatComponent chat = mc.gui.getChat();
+		ChatComponent chat = mc.gui.hud.getChat();
 		List<GuiMessage> all = Capture.allMessages(chat);
 		if (!aligned(mirror.records, all)) {
 			Reconciler.run(chat);
@@ -246,7 +246,7 @@ public final class OrphanRestore {
 	 */
 	public static CommitResult commit(Plan plan, ConfigSwap config, FileStep file) {
 		SessionMirror mirror = SessionMirror.get();
-		ChatComponent chat = Minecraft.getInstance().gui.getChat();
+		ChatComponent chat = Minecraft.getInstance().gui.hud.getChat();
 		ChatComponentAccessor access = (ChatComponentAccessor) chat;
 		List<GuiMessage> oldAll = access.cpextended$getAllMessages();
 		ArrayDeque<MessageRecord> oldRecords = mirror.records;
@@ -286,7 +286,7 @@ public final class OrphanRestore {
 		if (dirty) {
 			linesDirty = true;
 			rebuildAttempts = 0;
-			nextRebuildTick = Minecraft.getInstance().gui.getGuiTicks() + 1;
+			nextRebuildTick = Minecraft.getInstance().gui.hud.getGuiTicks() + 1;
 		}
 		Diagnostics.event("orphan_restore", "committed", true, "restored", plan.restoredCount(), "pruned", plan.prunedCount(), "linesDirty", dirty);
 		CpExtended.LOGGER.info("Orphan restoration: {} hidden message(s) from {} moved back to the main chat; {} older visible message(s) pruned by the history limit",
@@ -315,7 +315,7 @@ public final class OrphanRestore {
 	 * only rebuilds derived lines from the committed list; it never touches messages, references or configuration.
 	 */
 	public static void tick(Minecraft mc) {
-		boolean chatOpen = mc.screen instanceof ChatScreen;
+		boolean chatOpen = mc.gui.screen() instanceof ChatScreen;
 		boolean chatJustClosed = chatWasOpen && !chatOpen;
 		chatWasOpen = chatOpen;
 		long layout = layoutSignature(mc);
@@ -325,10 +325,10 @@ public final class OrphanRestore {
 		if (!linesDirty || chatOpen) return;
 		boolean rescaleTrigger = rescaled || rescalePending;
 		rescalePending = false;
-		int now = mc.gui.getGuiTicks();
+		int now = mc.gui.hud.getGuiTicks();
 		boolean scheduled = rebuildAttempts < 3 && now >= nextRebuildTick;
 		if (!scheduled && !(rebuildAttempts >= 3 && (chatJustClosed || rescaleTrigger)) && !(rebuildAttempts < 3 && rescaleTrigger)) return;
-		if (rebuildLines(mc.gui.getChat())) {
+		if (rebuildLines(mc.gui.hud.getChat())) {
 			linesDirty = false;
 			rebuildAttempts = 0;
 			Diagnostics.event("orphan_restore_rebuild", "ok", true);

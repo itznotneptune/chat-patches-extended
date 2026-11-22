@@ -55,8 +55,8 @@ public final class ChatScreenInput {
 	public static void register() {
 		ScreenEvents.AFTER_INIT.register((client, screen, w, h) -> {
 			if (!(screen instanceof ChatScreen chat)) return;
-			ScreenEvents.beforeRender(screen).register((s, g, mx, my, delta) -> ChatOpenRenderer.render(chat, g, mx, my));
-			ScreenEvents.afterRender(screen).register((s, g, mx, my, delta) -> ChatOpenRenderer.renderTooltip(chat, g, mx, my));
+			ScreenEvents.beforeExtract(screen).register((s, g, mx, my, delta) -> ChatOpenRenderer.render(chat, g, mx, my));
+			ScreenEvents.afterExtract(screen).register((s, g, mx, my, delta) -> ChatOpenRenderer.renderTooltip(chat, g, mx, my, delta));
 			ScreenMouseEvents.allowMouseClick(screen).register(ChatScreenInput::allowClick);
 			ScreenMouseEvents.allowMouseScroll(screen).register(ChatScreenInput::allowScroll);
 			ScreenMouseEvents.allowMouseDrag(screen).register(ChatScreenInput::allowDrag);

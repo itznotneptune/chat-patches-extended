@@ -85,6 +85,11 @@ abstract class BaseScreen extends Screen {
 						c.restored(), c.tabNames(), c.pruned())));
 	}
 
+	/** Opens another screen (the one place that knows how this Minecraft version switches screens). */
+	protected void show(@Nullable Screen next) {
+		minecraft.gui.setScreen(next);
+	}
+
 	protected void setStatus(String text, boolean error) {
 		status = Component.literal(text).withColor(error ? 0xFF6060 : 0x80FF80);
 	}

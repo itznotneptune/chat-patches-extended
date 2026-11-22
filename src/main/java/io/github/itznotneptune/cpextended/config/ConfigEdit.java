@@ -9,6 +9,8 @@ import io.github.itznotneptune.cpextended.filter.FilterSpec;
 import io.github.itznotneptune.cpextended.filter.PatternValidator;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
+
 /**
  * One intentional change to the configuration (P14 dirty tracking). An edit writes only the recognized keys it
  * changes into the raw tree; everything else (unknown keys, untouched invalid filters, duplicates) stays as stored.
@@ -249,6 +251,32 @@ public sealed interface ConfigEdit {
 		}
 	}
 
+	/**
+	 * Adds imported windows (with their tabs) at the front, as prepared and validated by {@link LayoutTransfer}: fresh
+	 * ids, nothing existing is changed or removed. Re-checked on every application (an edit can be re-applied on top of
+	 * an externally edited file): if any id is taken by then, the whole import is rejected.
+	 */
+	record ImportWindows(List<JsonObject> imported) implements ConfigEdit {
+		public ImportWindows {
+			imported = imported.stream().map(JsonObject::deepCopy).toList();
+		}
+
+		public Result apply(JsonObject root, ExtendedConfig view) {
+			for (JsonObject w : imported) {
+				String id = w.get("id").getAsString();
+				if (view.window(id) != null || view.windowOfTab(id) != null) return Result.rejected("window id " + id + " already exists; import again");
+				for (JsonElement t : w.getAsJsonArray("tabs")) {
+					String tabId = t.getAsJsonObject().get("id").getAsString();
+					if (view.window(tabId) != null || view.windowOfTab(tabId) != null) return Result.rejected("tab id " + tabId + " already exists; import again");
+				}
+			}
+			JsonArray ws = windows(root);
+			if (ws == null) return Result.rejected("windows is not an array in the file; edit the file to fix it");
+			for (JsonObject w : imported) ws.add(w.deepCopy());
+			return Result.OK;
+		}
+	}
+
 	// ---------------------------------------------------------------- helpers
 
 	/** The windows array, created if absent; null if the file holds something else there (never repaired). */
@@ -262,7 +290,7 @@ public sealed interface ConfigEdit {
 		return e.isJsonArray() ? e.getAsJsonArray() : null;
 	}
 
-	private static JsonObject newWindow(String id, double x, double y, double width, double height) {
+	static JsonObject newWindow(String id, double x, double y, double width, double height) {
 		JsonObject w = new JsonObject();
 		w.addProperty("id", id);
 		w.addProperty("enabled", true);

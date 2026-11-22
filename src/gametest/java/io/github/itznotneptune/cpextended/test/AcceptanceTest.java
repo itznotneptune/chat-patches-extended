@@ -133,6 +133,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 				case "hide_relaunch_nolog" -> new Phase7bTests(this).hideRelaunch(false);
 				case "extras" -> new ExtrasTests(this).extras();
 				case "regex" -> new RegexTests(this).regex();
+				case "transfer" -> new TransferTests(this).transfer();
 				case "conflict_bool", "conflict_int", "conflict_error" -> conflict();
 				case "structural_off", "structural_base", "structural_tabs", "structural_hide" -> structural();
 				default -> ev.data("error", "msg", "unknown mode " + mode);

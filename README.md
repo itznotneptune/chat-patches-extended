@@ -36,6 +36,12 @@ Client-side only. Other Minecraft or Chat Patches versions aren't supported, and
   - **A regex can't freeze the game.** Regex filters use RE2/J, which never backtracks, and a pattern is rejected if it expands to more than 1,000 steps (for example `(a{1000}){1000}`); the settings say "Regex too complex". An invalid regex is shown with the reason and can't be saved.
 - A tab with an invalid filter (for example an empty pattern or a broken regex edited into the file) is **suspended**: its history stays visible but it receives nothing new. The settings show why.
 
+## Importing and exporting windows and tabs
+- **Export** everything (main settings → **Import / Export...** → **Export everything...**), one window (**Export window...** on its screen) or one tab (**Export tab...** on its screen). Then **Copy to clipboard** to paste it anywhere, or **Save to file** to keep it in `config/cpextended-exports/`. A tab is exported as saved, so save first to include changes you just made.
+- **Import** from **Import / Export...**: **Paste from clipboard**, or click a saved file in the list (newest first; **Open exports folder** shows them). You're shown what will be added and asked to confirm.
+- **Importing only adds.** Imported windows and tabs are added as new ones, with their filters, settings and positions; nothing you already have is changed or removed. A tab exported on its own is imported into a new window.
+- An export that's damaged or edited into something invalid (for example a broken regex) is refused with the reason, and nothing is added. Something with an invalid filter can't be exported in the first place. Exports work between the Minecraft 26.2 and 1.21.11 versions of this mod.
+
 ## Using windows in game
 - **With chat closed**, windows show their newest lines, fading like the vanilla chat. They're hidden by F1, by Chat Visibility: Hidden, and when disabled.
 - **With chat open** (the chat input box stays focused):

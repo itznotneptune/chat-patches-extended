@@ -58,7 +58,7 @@ final class Phase3Tests {
 			+ " {\"id\": \"p3-a\", \"anchor\": \"TOP_RIGHT\", \"x\": 0.02, \"y\": 0.04, \"width\": 0.42, \"height\": 0.45, \"selectedTab\": \"pa1\", \"tabs\": ["
 			+ "{\"id\": \"pa1\", \"name\": \"One\", \"include\": [{\"mode\": \"literal\", \"pattern\": \"cpx#PA\"}]},"
 			+ "{\"id\": \"pa2\", \"name\": \"Two\", \"include\": [{\"mode\": \"literal\", \"pattern\": \"cpx#PB\"}]},"
-			+ "{\"id\": \"pa3\", \"name\": \"Bad\", \"include\": [{\"mode\": \"regex\", \"pattern\": \"x\"}]}]},\n"
+			+ "{\"id\": \"pa3\", \"name\": \"Bad\", \"include\": [{\"mode\": \"regex\", \"pattern\": \"[x\"}]}]},\n"
 			+ " {\"id\": \"p3-b\", \"anchor\": \"TOP_RIGHT\", \"x\": 0.12, \"y\": 0.36, \"width\": 0.28, \"height\": 0.30, \"tabs\": [{\"id\": \"pb\", \"include\": [{\"mode\": \"literal\", \"pattern\": \"cpx#PQ\"}]}]},\n"
 			+ " {\"id\": \"p3-off\", \"enabled\": false, \"tabs\": [{\"id\": \"poff\", \"include\": [{\"mode\": \"literal\", \"pattern\": \"cpx#PA\"}]}]}\n"
 			+ "]\n}\n";

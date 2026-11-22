@@ -229,7 +229,7 @@ final class Phase2Tests {
 	void v25c(TestSingleplayerContext sp) {
 		String p1025 = "x".repeat(1025);
 		write(cfg(), doc(window("w-c", tabJson("t-empty", filterJson("literal", "")) + "," + tabJson("t-glob", filterJson("glob", "a*"))
-				+ "," + tabJson("t-long", filterJson("literal", p1025)) + "," + tabJson("t-regex", filterJson("regex", "^\\[SC\\]"))
+				+ "," + tabJson("t-long", filterJson("literal", p1025)) + "," + tabJson("t-regex", filterJson("regex", "^[SC"))
 				+ "," + tabJson("t-ok", filterJson("literal", "cpx#P2C")))));
 		restart();
 		Map<String, List<String>> errs = configErrors();
@@ -245,7 +245,7 @@ final class Phase2Tests {
 				&& filterOf(saved, "t-glob", "include", 0).get("mode").getAsString().equals("glob")
 				&& filterOf(saved, "t-long", "include", 0).get("pattern").getAsString().equals(p1025)
 				&& filterOf(saved, "t-regex", "include", 0).get("mode").getAsString().equals("regex")
-				&& filterOf(saved, "t-regex", "include", 0).get("pattern").getAsString().equals("^\\[SC\\]");
+				&& filterOf(saved, "t-regex", "include", 0).get("pattern").getAsString().equals("^[SC"); // invalid regex (unclosed character class)
 		restart();
 		boolean stillSuspended = configErrors().keySet().containsAll(List.of("t-empty", "t-glob", "t-long", "t-regex"));
 		ev.result("V-25c", flagged && otherWorks && s == ConfigManager.SaveOutcome.SAVED && exact && stillSuspended, "configErrors", errs,
@@ -334,11 +334,12 @@ final class Phase2Tests {
 		t.waitT(8);
 		long ms = (System.nanoTime() - t0) / 1_000_000;
 		Map<String, List<String>> errs = configErrors();
-		boolean ok = errs.getOrDefault("r-catastrophic", List.of()).toString().contains("regex_unsupported")
-				&& errs.getOrDefault("r-valid", List.of()).toString().contains("regex_unsupported")
-				&& t.tabEntries("r-catastrophic").isEmpty() && t.tabEntries("r-valid").isEmpty() && tokInTab("r-ok", "cpx#R42-1") == 1;
+		// Regex filters run on RE2/J (no backtracking): the classic catastrophic pattern is valid and harmless.
+		boolean ok = !errs.containsKey("r-catastrophic") && !errs.containsKey("r-valid")
+				&& t.tabEntries("r-catastrophic").isEmpty() && tokInTab("r-valid", "cpx#R42-2") == 1 && tokInTab("r-valid", "cpx#R42-1") == 0
+				&& tokInTab("r-ok", "cpx#R42-1") == 1 && ms < 5000;
 		ev.result("V-42", ok, "configErrors", errs, "elapsedMsIncludingTicks", ms,
-				"note", "regex filters are never compiled: the only matcher in the build is LiteralMatcher (no java.util.regex use in routing)");
+				"note", "regex filters run on RE2/J (linear time, bounded program): (a+)+$ against 40 a's is valid and returns at once");
 	}
 
 	void v21cDuplicates() {
@@ -380,7 +381,7 @@ final class Phase2Tests {
 				&& inv.getAsJsonArray("include").get(1).getAsJsonObject().get("mode").getAsString().equals("glob");
 		restart();
 		boolean stillSuspended = configErrors().containsKey("inv");
-		ConfigManager.EditOutcome stillInvalid = edit(new ConfigEdit.SetFilter("inv", "include", 0, new FilterSpec("regex", "(a|b)", false)));
+		ConfigManager.EditOutcome stillInvalid = edit(new ConfigEdit.SetFilter("inv", "include", 0, new FilterSpec("regex", "(a|b", false))); // still an invalid regex
 		ConfigManager.EditOutcome addEmpty = edit(new ConfigEdit.AddFilter("other", "include", FilterSpec.literal("")));
 		ConfigManager.EditOutcome fixSecond = edit(new ConfigEdit.SetFilter("inv", "include", 1, FilterSpec.literal("fixed")));
 		ConfigManager.EditOutcome deleteFirst = edit(new ConfigEdit.DeleteFilter("inv", "include", 0));

@@ -23,6 +23,8 @@ dep = meta.get("depends", {})
 checks["pins"] = dep.get("minecraft") == "=1.21.11" and dep.get("chatpatches") == "=8.0.0" and dep.get("java") == ">=21"
 checks["loaderLowerBound"] = dep.get("fabricloader") == ">=0.19.5"
 checks["modMenuSuggestedOnly"] = meta.get("suggests", {}).get("modmenu") == "*" and "modmenu" not in dep
+# Regex filters: RE2/J is bundled as a nested jar (Q15 resolved 2026-11-22), so players need nothing extra.
+checks["re2jBundled"] = any(j.get("file", "").startswith("META-INF/jars/re2j-") for j in meta.get("jars", []))
 
 # Fabric API modules used by imports vs declared
 package_to_module = {
@@ -49,8 +51,10 @@ for log in logs:
             warnings.append(line.strip()[:200])
 checks["noLoaderWarnings"] = not warnings
 
-# V-46d (static): Extended never compiles or executes a regex. No class may reference java.util.regex, and none may
-# call the String methods that run one internally (matches, replaceAll, replaceFirst, split).
+# V-46d (static): Extended never uses a backtracking regex engine. Regex filters run only on the bundled RE2/J
+# (linear time, bounded program, see RegexSupport). No Extended class may reference java.util.regex, and none may
+# call the String methods that run one internally (matches, replaceAll, replaceFirst, split). The nested RE2/J jar
+# isn't scanned: its classes live in META-INF/jars, not in Extended's own entries.
 regex_refs, regex_calls = [], []
 javap = os.path.join(os.environ.get("JAVA_HOME", ""), "bin", "javap")
 with tempfile.TemporaryDirectory() as tmp, zipfile.ZipFile(jar) as z:

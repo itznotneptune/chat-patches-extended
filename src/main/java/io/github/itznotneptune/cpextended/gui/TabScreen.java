@@ -8,6 +8,7 @@ import io.github.itznotneptune.cpextended.config.ExtendedConfig;
 import io.github.itznotneptune.cpextended.config.Labels;
 import io.github.itznotneptune.cpextended.filter.FilterSpec;
 import io.github.itznotneptune.cpextended.filter.PatternValidator;
+import io.github.itznotneptune.cpextended.filter.RegexSupport;
 import io.github.itznotneptune.cpextended.model.TabConfig;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -69,8 +70,12 @@ public final class TabScreen extends BaseScreen {
 
 		boolean literal() { return mode == null || FilterSpec.LITERAL.equals(mode); }
 
-		/** Editable in a field: Literal with a stored value that fits, or being replaced. */
-		public boolean editable() { return replacing || literal() && pattern != null && pattern.length() <= PatternValidator.MAX_LENGTH && !ConfigParser.MALFORMED_FILTER.equals(mode); }
+		boolean regex() { return FilterSpec.REGEX.equals(mode); }
+
+		/** Editable in a field: Literal or Regex with a stored value that fits, or being replaced. */
+		public boolean editable() { return replacing || (literal() || regex()) && pattern != null && pattern.length() <= PatternValidator.MAX_LENGTH && !ConfigParser.MALFORMED_FILTER.equals(mode); }
+
+		public @Nullable String mode() { return mode; }
 
 		public @Nullable EditBox box() { return box; }
 		public @Nullable String error() { return error; }
@@ -144,16 +149,20 @@ public final class TabScreen extends BaseScreen {
 			int x = width / 2 - 154;
 			r.box = null;
 			if (r.editable()) {
-				EditBox box = new EditBox(font, x + 16, ry, 186, 20, Component.translatable("cpextended.gui.pattern"));
+				EditBox box = new EditBox(font, x + 16, ry, 160, 20, Component.translatable("cpextended.gui.pattern"));
 				box.setMaxLength(PatternValidator.MAX_LENGTH);
 				box.setValue(r.pattern == null ? "" : r.pattern); // fits by construction: setValue truncates, so over-length values never get here
 				box.setResponder(v -> { r.pattern = v; r.error = null; });
 				r.box = addRenderableWidget(box);
+				// Literal <-> Regex; Q14.1(4): the pattern text is kept exactly and revalidated on save.
+				Button modeToggle = addRenderableWidget(Button.builder(Component.literal(r.regex() ? ".*" : "ab"), b -> toggleMode(r))
+						.bounds(x + 178, ry, 26, 20).build());
+				modeToggle.setTooltip(Tooltip.create(Component.translatable(r.regex() ? "cpextended.gui.mode.regex" : "cpextended.gui.mode.literal")));
 			} else {
-				Button action = addRenderableWidget(Button.builder(Component.translatable(r.literal() ? "cpextended.gui.replace" : "cpextended.gui.switch_literal"), b -> {
-					if (r.literal() || ConfigParser.MALFORMED_FILTER.equals(r.mode)) {
+				Button action = addRenderableWidget(Button.builder(Component.translatable(r.literal() || r.regex() ? "cpextended.gui.replace" : "cpextended.gui.switch_literal"), b -> {
+					if (r.literal() || r.regex() || ConfigParser.MALFORMED_FILTER.equals(r.mode)) {
 						r.replacing = true; // explicit Replace: an empty field; the stored value is only overwritten on a valid save
-						r.mode = FilterSpec.LITERAL;
+						if (!r.regex()) r.mode = FilterSpec.LITERAL; // a Regex row stays Regex
 						r.pattern = "";
 					} else {
 						r.mode = FilterSpec.LITERAL; // Q14.1(4): keep the pattern text exactly, revalidate
@@ -195,7 +204,9 @@ public final class TabScreen extends BaseScreen {
 				r.error = switch (err) {
 					case "empty" -> "Pattern is empty";
 					case "too_long" -> "Pattern is longer than 1,024 characters";
-					case "regex_unsupported" -> "Regex mode isn't available in this version";
+					case RegexSupport.INVALID -> "Invalid regex: " + String.valueOf(PatternValidator.regexDetail(r.spec()));
+					case RegexSupport.TOO_COMPLEX -> "Regex too complex (over " + RegexSupport.MAX_PROGRAM + " steps); use fewer or smaller {n} repeats";
+					case RegexSupport.UNAVAILABLE -> "Regex filters are unavailable (see the log)";
 					default -> "Unsupported filter mode";
 				};
 				blocked = true;
@@ -245,7 +256,7 @@ public final class TabScreen extends BaseScreen {
 			if (!r.editable()) {
 				String text;
 				if (ConfigParser.MALFORMED_FILTER.equals(r.mode)) text = "Malformed entry (kept as stored)";
-				else if (!r.literal()) text = (FilterSpec.REGEX.equals(r.mode) ? "Regex (unsupported)" : "Unknown mode \"" + r.mode + "\"") + ": " + preview(r.pattern);
+				else if (!r.literal() && !r.regex()) text = "Unknown mode \"" + r.mode + "\": " + preview(r.pattern);
 				else if (r.pattern == null) text = "No pattern (kept as stored)";
 				else text = "Too long (" + r.pattern.length() + " characters), shown read-only";
 				g.drawString(font, font.plainSubstrByWidth(text, 112), x + 16, ry + 6, 0xFFFFAA55, true);
@@ -272,6 +283,13 @@ public final class TabScreen extends BaseScreen {
 
 	public void switchToLiteral(FilterRow r) {
 		r.mode = FilterSpec.LITERAL;
+		rebuildWidgets();
+	}
+
+	/** Literal <-> Regex, keeping the pattern text exactly (Q14.1(4)). */
+	public void toggleMode(FilterRow r) {
+		r.mode = r.regex() ? FilterSpec.LITERAL : FilterSpec.REGEX;
+		r.error = null;
 		rebuildWidgets();
 	}
 

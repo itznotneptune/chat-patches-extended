@@ -91,6 +91,9 @@ final class Phase4Tests {
 		return onClient(() -> {
 			Screen s = Minecraft.getInstance().screen;
 			if (s == null) return null;
+			// 26.2: dialogs add their text as child widgets (e.g. "...No visible message will be pruned."), so an exact
+			// button label wins over a widget that merely contains the text.
+			for (var ch : s.children()) if (ch instanceof net.minecraft.client.gui.components.AbstractButton w && w.getMessage().getString().equals(text)) return w;
 			for (var ch : s.children()) if (ch instanceof AbstractWidget w && w.getMessage().getString().contains(text)) return w;
 			return null;
 		});
@@ -274,7 +277,8 @@ final class Phase4Tests {
 		// rows: [0] literal cpx#GA, [1] regex (a|b + note, [2] empty literal (invalid)
 		TabScreen.FilterRow regex = onClient(() -> ts.rows().get(1));
 		TabScreen.FilterRow emptyStored = onClient(() -> ts.rows().get(2));
-		m.put("regexShownReadOnly", onClient(() -> !regex.editable() && regex.box() == null));
+		// Regex rows are edited in place; the stored (invalid) pattern is shown exactly.
+		m.put("regexEditableInPlace", onClient(() -> regex.editable() && regex.box() != null && "(a|b".equals(regex.box().getValue())));
 		// edit the stored invalid (empty) filter but leave it invalid -> blocked
 		ctx.runOnClient(c -> ts.toggleCase(emptyStored)); // a modification that leaves the filter invalid (still empty)
 		boolean blockedInvalidEdit = !onClient(ts::save);
@@ -310,7 +314,7 @@ final class Phase4Tests {
 		boolean unsuspended = !onClient(() -> io.github.itznotneptune.cpextended.core.Router.get().config().configErrorSummary().containsKey("ga1"));
 		m.put("deleteAndFixSaved", fixed);
 		m.put("unsuspended", unsuspended);
-		ev.result("V-21d.gui", Boolean.TRUE.equals(m.get("regexShownReadOnly")) && blockedInvalidEdit && savedUnrelated && preserved && stillSuspended
+		ev.result("V-21d.gui", Boolean.TRUE.equals(m.get("regexEditableInPlace")) && blockedInvalidEdit && savedUnrelated && preserved && stillSuspended
 				&& newEmptyBlocked && fixed && unsuspended, "observed", m);
 		ctx.setScreen(() -> null);
 	}

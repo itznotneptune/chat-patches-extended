@@ -100,6 +100,10 @@ public final class WindowScreen extends BaseScreen {
 			else minecraft.setScreen(new DeleteWindowScreen(this, windowId));
 		}).bounds(width / 2 - 50, height - 28, 100, 20).build());
 		addRenderableWidget(Button.builder(Component.translatable("gui.back"), b -> onClose()).bounds(width / 2 + 54, height - 28, 100, 20).build());
+		addRenderableWidget(Button.builder(Component.translatable("cpextended.gui.transfer.export_window"), b -> show(new ExportScreen(this,
+						Component.literal(Labels.window(windowId)), "window", Labels.window(windowId),
+						() -> io.github.itznotneptune.cpextended.config.LayoutTransfer.exportWindow(ConfigManager.get().config(), windowId))))
+				.bounds(width / 2 - 154, height - 52, 90, 20).build());
 	}
 
 	static String name(ExtendedConfig.Tab t) {

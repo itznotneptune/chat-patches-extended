@@ -184,6 +184,12 @@ public final class TabScreen extends BaseScreen {
 				.bounds(width / 2 - 50, listTop(), 100, 20).build());
 		addRenderableWidget(Button.builder(Component.translatable("cpextended.gui.save"), b -> save()).bounds(width / 2 - 154, height - 28, 150, 20).build());
 		addRenderableWidget(Button.builder(Component.translatable("gui.cancel"), b -> onClose()).bounds(width / 2 + 4, height - 28, 150, 20).build());
+		// Exports the tab as saved (unsaved edits on this screen aren't included; the tooltip says so).
+		addRenderableWidget(Button.builder(Component.translatable("cpextended.gui.transfer.export_tab"), b -> show(new ExportScreen(this,
+						Component.literal(name), "tab", name,
+						() -> io.github.itznotneptune.cpextended.config.LayoutTransfer.exportTab(ConfigManager.get().config(), tabId))))
+				.bounds(width / 2 - 154, height - 52, 90, 20).build())
+				.setTooltip(Tooltip.create(Component.translatable("cpextended.gui.transfer.export_tab.tooltip")));
 	}
 
 	private Button toggle(String key, boolean value, int x, int y, Runnable flip) {

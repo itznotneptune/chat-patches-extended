@@ -101,6 +101,8 @@ public final class ConfigScreen extends BaseScreen {
 		Button hiding = addRenderableWidget(Button.builder(Component.translatable(!on ? "cpextended.gui.hiding.off" : paused ? "cpextended.gui.hiding.paused" : "cpextended.gui.hiding.on"),
 				b -> apply(new ConfigEdit.SetHidingEnabled(!on))).bounds(width / 2 + 64, height - 52, 90, 20).build());
 		hiding.setTooltip(net.minecraft.client.gui.components.Tooltip.create(Component.translatable(paused ? "cpextended.gui.hiding.paused.tooltip" : "cpextended.gui.hiding.tooltip")));
+		addRenderableWidget(Button.builder(Component.translatable("cpextended.gui.transfer"), b -> show(new TransferScreen(this)))
+				.bounds(width / 2 - 154, height - 52, 90, 20).build());
 		addRenderableWidget(Button.builder(Component.translatable("cpextended.gui.add_window"), b -> addWindow())
 				.bounds(width / 2 - 154, height - 28, 150, 20).build());
 		addRenderableWidget(Button.builder(Component.translatable("gui.done"), b -> onClose())

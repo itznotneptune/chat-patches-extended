@@ -87,7 +87,7 @@ abstract class BaseScreen extends Screen {
 
 	/** Opens another screen (the one place that knows how this Minecraft version switches screens). */
 	protected void show(@Nullable Screen next) {
-		minecraft.gui.setScreen(next);
+		minecraft.setScreen(next);
 	}
 
 	protected void setStatus(String text, boolean error) {

@@ -49,7 +49,7 @@ final class TransferTests {
 
 	ExtendedConfig config() { return onClient(() -> mgr().config()); }
 
-	Screen screen() { return onClient(() -> Minecraft.getInstance().gui.screen()); }
+	Screen screen() { return onClient(() -> Minecraft.getInstance().screen); }
 
 	void restart() { ctx.runOnClient(c -> mgr().devSimulateRestart()); }
 
@@ -70,7 +70,7 @@ final class TransferTests {
 	void transfer() {
 		try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
 			t.waitT(40);
-			ctx.runOnClient(c -> HudState.setHidden(c, false));
+			ctx.runOnClient(c -> c.options.hideGui = false);
 			roundTripThroughScreens(sp);
 			windowAndTab();
 			invalidInputs();

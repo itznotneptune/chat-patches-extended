@@ -29,8 +29,12 @@ Client-side only. Other Minecraft or Chat Patches versions aren't supported, and
   - **Restored history**: whether messages Chat Patches restores from its log when you join a world go into this tab.
   - **All**: receive every message (when the tab has no include filters).
   - **Include / Exclude filters**: a message goes into the tab if any include filter matches (or the tab has none and "All" is on) and no exclude filter matches.
-- **Filters are literal text**: the pattern must appear in the message exactly; no wildcards or regular expressions. Each filter is case-insensitive unless you turn case sensitivity on. Patterns are up to 1,024 characters. A filter applies to new messages only.
-- A tab with an invalid filter (for example an empty pattern edited into the file) is **suspended**: its history stays visible but it receives nothing new. The settings show why.
+- **Each filter is Literal or Regex.** Switch with the **ab** / **.\*** button next to the pattern; the text is kept as typed.
+  - **Literal** (default): the pattern must appear in the message exactly, for example `[SC]`. No escaping needed.
+  - **Regex**: a regular expression, found anywhere in the message, for example `^\[(Admin|Mod)\] ` or `\bgg\b`. Use `^` and `$` to anchor. Backreferences (`\1`) and lookarounds (`(?=...)`) aren't supported.
+  - Each filter is case-insensitive unless you turn case sensitivity on (**aa** / **Aa**). Patterns are up to 1,024 characters. A filter applies to new messages only.
+  - **A regex can't freeze the game.** Regex filters use RE2/J, which never backtracks, and a pattern is rejected if it expands to more than 1,000 steps (for example `(a{1000}){1000}`); the settings say "Regex too complex". An invalid regex is shown with the reason and can't be saved.
+- A tab with an invalid filter (for example an empty pattern or a broken regex edited into the file) is **suspended**: its history stays visible but it receives nothing new. The settings show why.
 
 ## Using windows in game
 - **With chat closed**, windows show their newest lines, fading like the vanilla chat. They're hidden by F1, by Chat Visibility: Hidden, and when disabled.

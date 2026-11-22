@@ -19,6 +19,14 @@ public record FilterSpec(@Nullable String mode, @Nullable String pattern, boolea
 		return new FilterSpec(LITERAL, pattern, caseSensitive);
 	}
 
+	public static FilterSpec regex(String pattern) {
+		return new FilterSpec(REGEX, pattern, false);
+	}
+
+	public static FilterSpec regex(String pattern, boolean caseSensitive) {
+		return new FilterSpec(REGEX, pattern, caseSensitive);
+	}
+
 	public String effectiveMode() {
 		return mode == null ? LITERAL : mode;
 	}

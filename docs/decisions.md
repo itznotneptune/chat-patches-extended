@@ -89,7 +89,7 @@ Related documents: [feasibility-and-architecture.md](feasibility-and-architectur
 
 | ID | Title | Approved decision |
 |---|---|---|
-| **Q15** | Regex engine | **Literal-only initial release.** Regex mode is deferred until a demonstrably bounded implementation is approved. RE2/J remains a *proposal* for that later approval; no regex engine is approved. (Recorded from the owner's statement "preserve the approved Literal-only initial release", 2026-10-18.) |
+| **Q15** | Regex engine | **Literal-only initial release.** Regex mode is deferred until a demonstrably bounded implementation is approved. RE2/J remains a *proposal* for that later approval; no regex engine is approved. (Recorded from the owner's statement "preserve the approved Literal-only initial release", 2026-10-18.)<br>**Resolved 2026-11-22 (owner: "add regex filter", RE2/J approved), after the 26.2 port:** Regex mode runs on **RE2/J 1.8**, bundled as a nested jar. Bounds: (1) RE2/J never backtracks, so matching time is linear in the message length for a given program; (2) the compiled program is capped at **1,000 instructions**, because RE2/J's cost is proportional to program size x message length and nested counted repeats expand to millions of instructions (measured: `(a{1000}){1000}` took 11 s on a 32k-character message, and `((a{1000}){1000}){1000}` exhausted the heap while compiling). The pattern is therefore parsed with RE2/J's own parser first and an upper bound of the compiled size, which never undershoots (fuzz-checked against ~900,000 patterns), gates compilation; the real program size then decides. Worst accepted case measured at about 1,000 instructions x 10-18 ns per instruction and character. Unsupported syntax (backreferences, lookarounds) is a validation error. See `RegexSupport`. |
 | **Q17** | Suspended tabs | Preserve existing history **read-only**; stop new routing and hiding; display configuration errors. Suspension isn't deletion and **doesn't trigger orphan restoration**. |
 | **Q18** | Input priority | **Vanilla chat input, command suggestions, visible main-chat message lines and Chat Patches' interactive regions** take priority over overlapping Extended windows. **Invisible or inactive regions must not intercept input.** Windows stay interactive in unobstructed regions. |
 | **Q19** | Hidden windows | Explicitly hidden or disabled windows, **F1** HUD hiding, and **Chat Visibility: Hidden** all count as hidden *for unread purposes*. Hidden windows **keep routing and applying approved filters**; they aren't suspended. |
@@ -99,8 +99,8 @@ Related documents: [feasibility-and-architecture.md](feasibility-and-architectur
 | **Q23** | Unread counters | Restored history doesn't add unread. **Condensed duplicates count once per displayed tab entry**, not per incoming occurrence. Pruning unread entries reduces unread; **unread can't exceed retained unread entries.** Verify how condensation can be reliably detected. |
 
 **Scope notes (not new decisions):**
-- **D6.1** (Literal and Regex modes) stays approved as the long-term design. Q15 defers its Regex half: in the initial release, a filter with `"mode": "regex"` is a *recognized but unsupported* mode, so it's invalid and suspends its tab (Q14/Q17).
-- **Q14.1(2)** is satisfied trivially in the initial release, since no regex runs.
+- **D6.1** (Literal and Regex modes) stays approved as the long-term design. Q15 defers its Regex half: in the initial release, a filter with `"mode": "regex"` is a *recognized but unsupported* mode, so it's invalid and suspends its tab (Q14/Q17). *(Superseded 2026-11-22: Regex mode is supported; see Q15. A regex that doesn't compile within the bounds is invalid and suspends its tab.)*
+- **Q14.1(2)** is satisfied trivially in the initial release, since no regex runs. *(2026-11-22: satisfied by RE2/J plus the 1,000-instruction program cap, see Q15.)*
 
 ### 1.3a Q16 (approved; register corrected 2026-10-18)
 

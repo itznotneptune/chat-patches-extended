@@ -61,6 +61,11 @@ dependencies {
     implementation("net.fabricmc:fabric-loader:${(project.findProperty("runtimeLoader") as String?) ?: loaderVersion}")
     for (m in fabricModules) implementation(fabricApi.module(m, fabricApiVersion))
 
+    // Regex filters (Q15 resolved, 2026-11-22): RE2/J, bundled as a nested jar so players need nothing extra.
+    val re2j = "com.google.re2j:re2j:${project.property("re2j_version")}"
+    implementation(re2j)
+    include(re2j)
+
     // Optional Mod Menu integration (Q20): compile-only; present at dev runtime only with -Pextras=modmenu (V-14, V-38).
     compileOnly("maven.modrinth:modmenu:${project.property("modmenu_version")}")
 
@@ -112,7 +117,7 @@ tasks.processResources {
 }
 
 tasks.jar {
-    from("LICENSE", "COPYING")
+    from("LICENSE", "COPYING", "THIRD_PARTY_NOTICES.txt")
 }
 
 // Reproducible archives (release candidate): fixed timestamps and a stable entry order, so the same sources and

@@ -132,6 +132,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 				case "hide_seed_nolog" -> new Phase7bTests(this).hideSeed(false);
 				case "hide_relaunch_nolog" -> new Phase7bTests(this).hideRelaunch(false);
 				case "extras" -> new ExtrasTests(this).extras();
+				case "regex" -> new RegexTests(this).regex();
 				case "conflict_bool", "conflict_int", "conflict_error" -> conflict();
 				case "structural_off", "structural_base", "structural_tabs", "structural_hide" -> structural();
 				default -> ev.data("error", "msg", "unknown mode " + mode);
@@ -337,7 +338,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 				tab("ws", "double  space"), tab("sect", "§l"), tab("emoji", "😀"), tab("lone", "\uD800"),
 				tab("tripleA", "cpx#TRIPLE"), tab("tripleB", "cpx#TRIPLE"), tab("tripleC", "cpx#TRIPLE"),
 				tab("trade", List.of(FilterSpec.literal("[Trade]")), List.of(FilterSpec.literal("[bot]"))),
-				tab("invalid-regex", List.of(new FilterSpec("regex", "cpx#", false)), List.of()),
+				tab("invalid-regex", List.of(new FilterSpec("regex", "cpx#(", false)), List.of()), // invalid regex (unclosed group)
 				tab("invalid-empty", List.of(FilterSpec.literal("")), List.of()));
 	}
 
@@ -479,7 +480,7 @@ public final class AcceptanceTest implements FabricClientGameTest {
 			ok &= rowOk;
 			rows.add(row("token", tm.group(), "expected", expected, "got", got, "ok", rowOk));
 		}
-		// Invalid filters (regex mode, empty) suspend their tab and are never executed (Q14, Q15, Q28).
+		// Invalid filters (a regex that does not compile, empty) suspend their tab and are never executed (Q14, Q15, Q28).
 		Map<String, List<String>> errors = ctx.computeOnClient(c -> Router.get().config().configErrorSummary());
 		boolean invalidOk = errors.containsKey("invalid-regex") && errors.containsKey("invalid-empty")
 				&& tabEntries("invalid-regex").isEmpty() && tabEntries("invalid-empty").isEmpty();

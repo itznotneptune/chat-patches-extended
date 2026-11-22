@@ -7,6 +7,7 @@ import io.github.itznotneptune.cpextended.filter.LiteralMatcher;
 import io.github.itznotneptune.cpextended.filter.MatchText;
 import io.github.itznotneptune.cpextended.filter.Matcher;
 import io.github.itznotneptune.cpextended.filter.PatternValidator;
+import io.github.itznotneptune.cpextended.filter.RegexMatcher;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -87,7 +88,8 @@ public final class RoutingConfig {
 				errors.add(kind + "[" + i + "]:" + err);
 				continue;
 			}
-			out.add(DevHooks.decorate(tab.id(), new LiteralMatcher(f.pattern(), f.caseSensitive())));
+			Matcher m = FilterSpec.REGEX.equals(f.effectiveMode()) ? RegexMatcher.of(f.pattern(), f.caseSensitive()) : new LiteralMatcher(f.pattern(), f.caseSensitive());
+			out.add(DevHooks.decorate(tab.id(), m));
 		}
 		return out;
 	}
